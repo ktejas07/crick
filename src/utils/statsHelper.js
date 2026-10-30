@@ -1,4 +1,50 @@
-import { strikeRate, economy } from './cricketEngine'
+import { strikeRate, economy } from './cricketEngine.js'
+
+export function getPlayerMatchStats(matches, playerId, includeLive = false) {
+  const eligibleStatuses = includeLive
+    ? new Set(['completed', 'innings1', 'innings2'])
+    : new Set(['completed'])
+
+  return matches
+    .filter(match => eligibleStatuses.has(match.status) && (
+      match.teamA?.playerIds?.includes(playerId) || match.teamB?.playerIds?.includes(playerId)
+    ))
+    .map(match => {
+      let batting = null
+      let bowling = null
+
+      for (const innings of match.innings || []) {
+        const inningsBatting = innings.batting?.[playerId]
+        if (inningsBatting) {
+          batting ||= { runs: 0, balls: 0, fours: 0, sixes: 0, highScore: 0, isOut: false, dismissal: '' }
+          batting.runs += inningsBatting.runs || 0
+          batting.balls += inningsBatting.balls || 0
+          batting.fours += inningsBatting.fours || 0
+          batting.sixes += inningsBatting.sixes || 0
+          batting.highScore = Math.max(batting.highScore, inningsBatting.runs || 0)
+          batting.isOut ||= Boolean(inningsBatting.isOut)
+          if (inningsBatting.dismissal) batting.dismissal = inningsBatting.dismissal
+        }
+
+        const inningsBowling = innings.bowling?.[playerId]
+        if (inningsBowling) {
+          bowling ||= { balls: 0, runs: 0, wickets: 0, maidens: 0 }
+          bowling.balls += inningsBowling.balls || 0
+          bowling.runs += inningsBowling.runs || 0
+          bowling.wickets += inningsBowling.wickets || 0
+          bowling.maidens += inningsBowling.maidens || 0
+        }
+      }
+
+      return {
+        matchId: match.id,
+        matchTitle: match.title,
+        date: match.createdAt,
+        batting,
+        bowling,
+      }
+    })
+}
 
 /**
  * Aggregate player stats across multiple matches.
@@ -31,8 +77,12 @@ export function aggregatePlayerStats(matchStatsList) {
     },
   }
 
+  const seenMatchIds = new Set()
   for (const stat of matchStatsList) {
-    agg.totalMatches += 1
+    if (!stat.matchId || !seenMatchIds.has(stat.matchId)) {
+      agg.totalMatches += 1
+      if (stat.matchId) seenMatchIds.add(stat.matchId)
+    }
 
     const b = stat.batting
     if (b && b.balls > 0) {
@@ -42,13 +92,14 @@ export function aggregatePlayerStats(matchStatsList) {
       agg.batting.fours     += b.fours  || 0
       agg.batting.sixes     += b.sixes  || 0
       if (!b.isOut) agg.batting.notOuts += 1
-      if ((b.runs || 0) > agg.batting.highScore) {
-        agg.batting.highScore = b.runs || 0
+      const highScore = b.highScore ?? b.runs ?? 0
+      if (highScore > agg.batting.highScore) {
+        agg.batting.highScore = highScore
       }
     }
 
     const bw = stat.bowling
-    if (bw && bw.balls > 0) {
+    if (bw && (bw.balls > 0 || bw.runs > 0 || bw.wickets > 0)) {
       agg.bowling.innings  += 1
       agg.bowling.balls    += bw.balls   || 0
       agg.bowling.runs     += bw.runs    || 0

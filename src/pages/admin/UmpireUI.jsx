@@ -15,6 +15,8 @@ import {
   processDelivery,
   undoLastBall,
   isInningsComplete,
+  getChaseWinResult,
+  getMatchResult,
   formatOvers,
   getCurrentOverBalls,
   DELIVERY_TYPES,
@@ -135,9 +137,11 @@ export default function UmpireUI() {
         innings: newInnings,
         ...extraUpdates,
       })
+      return true
     } catch (err) {
       toast.error('Save failed — check connection')
       console.error(err)
+      return false
     } finally {
       setSaving(false)
     }
@@ -158,10 +162,32 @@ export default function UmpireUI() {
     const result = processDelivery(innings, annotated)
     const { innings: newInnings, needsNewBatsman, needsNewBowler } = result
 
+    if (inningsIdx === 1) {
+      const target = (match.innings?.[0]?.runs || 0) + 1
+      const battingTeamName = newInnings.battingTeam === 'teamA' ? match.teamA?.name : match.teamB?.name
+      const chaseResult = getChaseWinResult(newInnings, target, battingTeamName || 'Batting team')
+      if (chaseResult) {
+        const saved = await saveInnings(newInnings, { status: 'completed', result: chaseResult })
+        if (saved) toast.success(chaseResult)
+        return
+      }
+    }
+
     // Check innings complete
     const complete = isInningsComplete(newInnings, match.overs)
 
     if (complete) {
+      if (inningsIdx === 1) {
+        const matchResult = getMatchResult(
+          match.innings[0],
+          newInnings,
+          match.teamA?.name || 'Team A',
+          match.teamB?.name || 'Team B',
+        )
+        const saved = await saveInnings(newInnings, { status: 'completed', result: matchResult })
+        if (saved) toast.success(matchResult)
+        return
+      }
       await saveInnings(newInnings)
       setShowEnd(true)
       return
@@ -307,16 +333,7 @@ export default function UmpireUI() {
       // Complete match — determine result
       const inn1 = match.innings[0]
       const inn2 = innings
-      let result = ''
-      if (inn2.runs > inn1.runs) {
-        const wicketsLeft = 10 - inn2.wickets
-        result = `${inn2.battingTeam === 'teamA' ? match.teamA.name : match.teamB.name} won by ${wicketsLeft} wickets`
-      } else if (inn1.runs > inn2.runs) {
-        const runMargin = inn1.runs - inn2.runs
-        result = `${inn1.battingTeam === 'teamA' ? match.teamA.name : match.teamB.name} won by ${runMargin} runs`
-      } else {
-        result = 'Match tied!'
-      }
+      const result = getMatchResult(inn1, inn2, match.teamA.name, match.teamB.name)
 
       await updateDoc(doc(db, 'matches', matchId), {
         innings: match.innings.map((inn, i) => i === inningsIdx ? innings : inn),

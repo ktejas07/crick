@@ -339,6 +339,25 @@ export function isInningsComplete(innings, maxOvers, maxWickets = 10) {
   )
 }
 
+export function getChaseWinResult(innings, target, battingTeamName, maxWickets = 10) {
+  if (!Number.isFinite(target) || innings.runs < target) return null
+  const wicketsLeft = Math.max(0, maxWickets - innings.wickets)
+  return `${battingTeamName} won by ${wicketsLeft} wickets`
+}
+
+export function getMatchResult(firstInnings, secondInnings, teamAName, teamBName) {
+  const firstTeamName = firstInnings.battingTeam === 'teamA' ? teamAName : teamBName
+  const secondTeamName = secondInnings.battingTeam === 'teamA' ? teamAName : teamBName
+
+  if (secondInnings.runs > firstInnings.runs) {
+    return `${secondTeamName} won by ${10 - secondInnings.wickets} wickets`
+  }
+  if (firstInnings.runs > secondInnings.runs) {
+    return `${firstTeamName} won by ${firstInnings.runs - secondInnings.runs} runs`
+  }
+  return 'Match tied!'
+}
+
 /**
  * Format overs: 2.3 means 2 overs 3 balls.
  */

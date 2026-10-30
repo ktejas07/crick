@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { motion } from 'framer-motion'
 import { Play, Shield } from 'lucide-react'
 import { db } from '../firebase'
@@ -13,7 +13,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
 import Avatar from '../components/ui/Avatar'
-import { formatOvers, strikeRate, economy } from '../utils/cricketEngine'
+import { formatOvers, strikeRate } from '../utils/cricketEngine'
 
 export default function LiveMatch() {
   const { id } = useParams()
@@ -31,6 +31,14 @@ export default function LiveMatch() {
     return unsub
   }, [id])
 
+  useEffect(() => onSnapshot(collection(db, 'players'), snap => {
+    const playerMap = {}
+    snap.docs.forEach(playerDoc => {
+      playerMap[playerDoc.id] = { id: playerDoc.id, ...playerDoc.data() }
+    })
+    setPlayers(playerMap)
+  }), [])
+
   if (loading) return (
     <AppLayout backTo="/matches">
       <div className="flex justify-center py-20"><Spinner size="lg" /></div>
@@ -44,7 +52,7 @@ export default function LiveMatch() {
   )
 
   const isLive = match.status === 'innings1' || match.status === 'innings2'
-  const inningsIdx = match.status === 'innings2' ? 1 : 0
+  const inningsIdx = match.status === 'innings2' || (match.status === 'completed' && match.innings?.length > 1) ? 1 : 0
   const currentInnings = match.innings?.[inningsIdx]
 
   const getPlayerName = (uid) => players[uid]?.name || uid?.slice(0, 8) || '—'
@@ -109,7 +117,7 @@ export default function LiveMatch() {
         )}
 
         {/* Second innings summary (if in innings2) */}
-        {match.status === 'innings2' && match.innings?.[0] && (
+        {(match.status === 'innings2' || match.status === 'completed') && match.innings?.[0] && (
           <Card animate={false} className="text-sm">
             <p className="text-white/40 text-xs mb-1">1st Innings</p>
             <div className="flex justify-between">
@@ -127,7 +135,7 @@ export default function LiveMatch() {
         )}
 
         {/* Current Players at Crease */}
-        {currentInnings && isLive && (
+        {currentInnings && (isLive || match.status === 'completed') && (
           <Card animate={false}>
             <p className="text-white/40 text-xs uppercase tracking-widest mb-3">At the Crease</p>
             <div className="space-y-2">
@@ -163,7 +171,7 @@ export default function LiveMatch() {
         )}
 
         {/* Bowling */}
-        {currentInnings?.currentBowler && isLive && (
+        {currentInnings?.currentBowler && (isLive || match.status === 'completed') && (
           <Card animate={false}>
             <p className="text-white/40 text-xs uppercase tracking-widest mb-2">Bowling</p>
             {(() => {

@@ -8,19 +8,27 @@ import AppLayout from '../components/Layout/AppLayout'
 import Avatar from '../components/ui/Avatar'
 import Spinner from '../components/ui/Spinner'
 import Badge from '../components/ui/Badge'
+import { aggregatePlayerStats, getPlayerMatchStats } from '../utils/statsHelper'
 
 export default function Players() {
   const [players, setPlayers] = useState([])
+  const [matches, setMatches] = useState([])
   const [search, setSearch]   = useState('')
-  const [loading, setLoading] = useState(true)
+  const [playersLoaded, setPlayersLoaded] = useState(false)
+  const [matchesLoaded, setMatchesLoaded] = useState(false)
+  const loading = !playersLoaded || !matchesLoaded
 
   useEffect(() => {
     const q = query(collection(db, 'players'), orderBy('name'))
     const unsub = onSnapshot(q, snap => {
       setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-      setLoading(false)
+      setPlayersLoaded(true)
     })
-    return unsub
+    const unsubscribeMatches = onSnapshot(collection(db, 'matches'), snap => {
+      setMatches(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      setMatchesLoaded(true)
+    })
+    return () => { unsub(); unsubscribeMatches() }
   }, [])
 
   const filtered = players.filter(p =>
@@ -65,6 +73,9 @@ export default function Players() {
                 transition={{ delay: i * 0.03 }}
               >
                 <Link to={`/player/${p.id}`}>
+                  {(() => {
+                    const stats = aggregatePlayerStats(getPlayerMatchStats(matches, p.id))
+                    return (
                   <div className="flex items-center gap-3 bg-card border border-border rounded-xl p-3
                                   hover:border-sapphire/40 hover:bg-midnight-300 transition-all duration-200">
                     <Avatar name={p.name} size="md" />
@@ -77,18 +88,20 @@ export default function Players() {
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
                         <span className="text-xs text-white/40">
-                          {p.stats?.totalMatches || 0} matches
+                          {stats.totalMatches} matches
                         </span>
                         <span className="text-xs text-gold">
-                          {p.stats?.totalRuns || 0} runs
+                          {stats.batting.runs} runs
                         </span>
                         <span className="text-xs text-danger">
-                          {p.stats?.totalWickets || 0} wkts
+                          {stats.bowling.wickets} wkts
                         </span>
                       </div>
                     </div>
                     <div className="text-white/20 text-sm">›</div>
                   </div>
+                    )
+                  })()}
                 </Link>
               </motion.div>
             ))}

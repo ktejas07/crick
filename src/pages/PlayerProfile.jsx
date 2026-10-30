@@ -8,7 +8,7 @@ import Avatar from '../components/ui/Avatar'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
-import { aggregatePlayerStats } from '../utils/statsHelper'
+import { aggregatePlayerStats, getPlayerMatchStats } from '../utils/statsHelper'
 import useAuthStore from '../store/useAuthStore'
 
 function StatBox({ label, value, sub, color = 'text-white' }) {
@@ -46,29 +46,7 @@ export default function PlayerProfile() {
         const matchSnap = await getDocs(collection(db, 'matches'))
         const allMatches = matchSnap.docs.map(d => ({ id: d.id, ...d.data() }))
 
-        const playerMatches = allMatches.filter(m =>
-          m.teamA?.playerIds?.includes(id) || m.teamB?.playerIds?.includes(id)
-        )
-
-        // Extract per-match stats
-        const matchStats = []
-        for (const m of playerMatches) {
-          if (m.status !== 'completed' && m.status !== 'innings2' && m.status !== 'innings1') continue
-          for (const inn of (m.innings || [])) {
-            const batting = inn.batting?.[id] || null
-            const bowling = inn.bowling?.[id] || null
-            if (batting || bowling) {
-              matchStats.push({
-                matchId: m.id,
-                matchTitle: m.title,
-                date: m.createdAt,
-                batting,
-                bowling,
-              })
-            }
-          }
-        }
-
+        const matchStats = getPlayerMatchStats(allMatches, id, true)
         setMatchHistory(matchStats)
         setStats(aggregatePlayerStats(matchStats))
       } finally {

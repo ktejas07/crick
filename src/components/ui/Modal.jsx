@@ -24,29 +24,32 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' })
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          {/* Sheet */}
-          <motion.div
-            className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] ${widths[size]}
-                        bg-card border border-border rounded-2xl shadow-card z-50 p-5`}
-            initial={{ opacity: 0, scale: 0.9, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: 8 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              {title && (
-                <h3 className="font-display font-semibold text-lg text-white">{title}</h3>
-              )}
-              <button
-                onClick={onClose}
-                className="ml-auto p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-midnight-300 transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            {children}
-          </motion.div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+            <motion.div
+              className={`pointer-events-auto relative flex max-h-[calc(100dvh-2rem)] w-full ${widths[size]} flex-col
+                          overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-card`}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            >
+              <div className="mb-4 flex shrink-0 items-center justify-between">
+                {title && (
+                  <h3 className="font-display font-semibold text-lg text-white">{title}</h3>
+                )}
+                <button
+                  onClick={onClose}
+                  className="ml-auto p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-midnight-300 transition-colors"
+                  aria-label="Close dialog"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="min-h-0 overflow-y-auto overscroll-contain">
+                {children}
+              </div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>

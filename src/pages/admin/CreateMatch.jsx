@@ -26,12 +26,16 @@ export default function CreateMatch() {
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!title.trim()) { toast.error('Match title required'); return }
+    if (!Number.isInteger(Number(overs)) || Number(overs) < 1 || Number(overs) > 50) {
+      toast.error('Overs must be a whole number between 1 and 50')
+      return
+    }
     setLoading(true)
     try {
       const matchData = {
         title:    title.trim(),
         venue:    venue.trim() || 'TBD',
-        overs,
+        overs: Number(overs),
         status:   'scheduled',
         teamA:    { name: teamAName.trim() || 'Team A', playerIds: [] },
         teamB:    { name: teamBName.trim() || 'Team B', playerIds: [] },
@@ -107,6 +111,21 @@ export default function CreateMatch() {
                     </button>
                   ))}
                 </div>
+                <label className="block mt-2">
+                  <span className="text-xs text-white/40">Or enter a custom number (1-50)</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    step="1"
+                    inputMode="numeric"
+                    value={overs}
+                    onChange={event => setOvers(event.target.value === '' ? '' : Number(event.target.value))}
+                    className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-4 py-3 text-white
+                               focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold/30"
+                    aria-label="Custom overs per side"
+                  />
+                </label>
               </div>
             </div>
 

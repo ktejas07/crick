@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Play, Calendar, Trophy, Bell, ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -10,6 +10,7 @@ import MatchCard from '../components/MatchCard'
 import Badge from '../components/ui/Badge'
 import Card from '../components/ui/Card'
 import Spinner from '../components/ui/Spinner'
+import { aggregatePlayerStats, getPlayerMatchStats } from '../utils/statsHelper'
 
 export default function Dashboard() {
   const { user, profile } = useAuthStore()
@@ -21,7 +22,6 @@ export default function Dashboard() {
     const q = query(
       collection(db, 'matches'),
       orderBy('createdAt', 'desc'),
-      limit(20),
     )
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -40,6 +40,9 @@ export default function Dashboard() {
     m.teamA?.playerIds?.includes(user?.uid) ||
     m.teamB?.playerIds?.includes(user?.uid)
   )
+  const myStats = user?.uid
+    ? aggregatePlayerStats(getPlayerMatchStats(matches, user.uid))
+    : null
 
   // Unread notifications
   const unread = (profile?.notifications || []).filter(n => !n.read).length
@@ -113,9 +116,9 @@ export default function Dashboard() {
           <h2 className="font-display font-bold text-base text-white mb-3">My Stats</h2>
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: 'Matches',  value: profile?.stats?.totalMatches  || 0, color: 'text-sapphire-light' },
-              { label: 'Runs',     value: profile?.stats?.totalRuns     || 0, color: 'text-gold' },
-              { label: 'Wickets',  value: profile?.stats?.totalWickets  || 0, color: 'text-danger' },
+              { label: 'Matches',  value: myStats?.totalMatches || 0, color: 'text-sapphire-light' },
+              { label: 'Runs',     value: myStats?.batting?.runs || 0, color: 'text-gold' },
+              { label: 'Wickets',  value: myStats?.bowling?.wickets || 0, color: 'text-danger' },
             ].map(stat => (
               <Card key={stat.label} className="text-center py-3 px-2" animate={false}>
                 <p className={`font-display font-black text-2xl ${stat.color}`}>{stat.value}</p>
