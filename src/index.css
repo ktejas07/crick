@@ -1,0 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-midnight text-white font-sans;
+    background: linear-gradient(135deg, #080C14 0%, #0E1625 60%, #121F38 100%);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-midnight-100;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-sapphire;
+  }
+
+  /* Selection highlight */
+  ::selection {
+    background: rgba(245, 158, 11, 0.3);
+    color: #FDE68A;
+  }
+}
+
+@layer components {
+  /* Glass card effect */
+  .glass {
+    background: rgba(18, 31, 56, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(30, 58, 110, 0.5);
+  }
+
+  .glass-light {
+    background: rgba(14, 22, 37, 0.8);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(30, 58, 110, 0.3);
+  }
+
+  /* Gold gradient text */
+  .text-gold-gradient {
+    background: linear-gradient(90deg, #F59E0B, #FBBF24, #FDE68A);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Sapphire gradient text */
+  .text-sapphire-gradient {
+    background: linear-gradient(90deg, #3B82F6, #60A5FA, #93C5FD);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Glow borders */
+  .border-gold-glow {
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+  }
+
+  .border-sapphire-glow {
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+  }
+
+  /* Umpire button */
+  .umpire-btn {
+    @apply relative flex flex-col items-center justify-center rounded-2xl font-display font-bold
+           transition-all duration-150 select-none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    user-select: none;
+  }
+
+  .umpire-btn:active {
+    transform: scale(0.92);
+  }
+
+  /* Live dot */
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #34D399;
+    animation: livePulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes livePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); }
+    50%       { box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
+  }
+
+  /* Score animation */
+  .score-flash {
+    animation: scoreFlash 0.5s ease-out;
+  }
+
+  @keyframes scoreFlash {
+    0%   { color: #FDE68A; transform: scale(1.2); }
+    100% { color: inherit; transform: scale(1); }
+  }
+
+  /* Ball indicator */
+  .ball-dot {
+    @apply w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200;
+  }
+  .ball-dot-normal  { @apply bg-midnight-300 text-white border border-border; }
+  .ball-dot-four    { @apply bg-sapphire text-white; }
+  .ball-dot-six     { @apply bg-gold text-midnight font-black; }
+  .ball-dot-wicket  { @apply bg-danger text-white; }
+  .ball-dot-wide    { @apply bg-midnight-300 text-yellow-400 border border-yellow-500; }
+  .ball-dot-noball  { @apply bg-midnight-300 text-orange-400 border border-orange-500; }
+  .ball-dot-empty   { @apply bg-midnight-200 border border-border opacity-40; }
+
+  /* Page container */
+  .page-container {
+    @apply max-w-md mx-auto px-4 pb-24 pt-4;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 1.5rem);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  /* No-bounce scroll */
+  .overscroll-none {
+    overscroll-behavior: none;
+  }
+}
+
