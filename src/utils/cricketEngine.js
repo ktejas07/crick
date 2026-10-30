@@ -47,12 +47,14 @@ export function createInnings(battingTeam, bowlingTeam, striker, nonStriker, cur
  * Ensure batting/bowling records exist for players.
  */
 function ensureBatting(innings, uid) {
+  if (!uid) return
   if (!innings.batting[uid]) {
     innings.batting[uid] = { runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false, dismissal: '', dismissedBy: '' }
   }
 }
 
 function ensureBowling(innings, uid) {
+  if (!uid) return
   if (!innings.bowling[uid]) {
     innings.bowling[uid] = { balls: 0, runs: 0, wickets: 0, maidens: 0, wides: 0, noBalls: 0 }
   }
@@ -122,8 +124,7 @@ export function processDelivery(innings, delivery) {
     inn.bowling[bowler].runs   += 1 + runs
     inn.bowling[bowler].noBalls += 1
     // Batter gets credit for runs off bat on no-ball
-    inn.batting[striker].runs  += runs
-    inn.batting[striker].balls += 0 // NB doesn't count against batter balls faced technically (but some formats count it)
+    if (striker) inn.batting[striker].runs += runs
     ballRecord.totalRuns = 1 + runs
   } else if (type === DELIVERY_TYPES.BYE) {
     inn.extras.byes   += runs
@@ -140,11 +141,13 @@ export function processDelivery(innings, delivery) {
   } else {
     // Normal delivery
     inn.runs                   += runs
-    inn.batting[striker].runs  += runs
-    inn.batting[striker].balls += 1
+    if (striker) {
+      inn.batting[striker].runs  += runs
+      inn.batting[striker].balls += 1
+    }
     inn.bowling[bowler].runs   += runs
-    if (runs === 4) inn.batting[striker].fours += 1
-    if (runs === 6) inn.batting[striker].sixes += 1
+    if (striker && runs === 4) inn.batting[striker].fours += 1
+    if (striker && runs === 6) inn.batting[striker].sixes += 1
     ballRecord.totalRuns = runs
   }
 
@@ -161,9 +164,6 @@ export function processDelivery(innings, delivery) {
     const bowlerWicket = !['Run Out', 'Obstructing the Field'].includes(wicketType)
     if (bowlerWicket) inn.bowling[bowler].wickets += 1
 
-    if (type === DELIVERY_TYPES.NORMAL || type === DELIVERY_TYPES.NOBALL) {
-      inn.batting[striker].balls += (type === DELIVERY_TYPES.NORMAL ? 0 : 0) // already counted above for normal
-    }
     needsNewBatsman = true
     ballRecord.isWicket     = true
     ballRecord.wicketType   = wicketType
@@ -185,7 +185,7 @@ export function processDelivery(innings, delivery) {
       inn.ballsInCurrentOver = 0
       needsNewBowler         = true
       // Strike rotates at end of over
-      if (!isWicket || (isWicket && dismissedBatter === inn.nonStriker)) {
+      if (inn.nonStriker && (!isWicket || dismissedBatter === inn.nonStriker)) {
         const tmp      = inn.striker
         inn.striker    = inn.nonStriker
         inn.nonStriker = tmp
@@ -197,7 +197,7 @@ export function processDelivery(innings, delivery) {
       if (overRuns === 0) inn.bowling[bowler].maidens += 1
     } else {
       // Strike rotates on odd runs (1, 3)
-      if (!isWicket) {
+      if (!isWicket && inn.nonStriker) {
         const totalDeliveryRuns = ballRecord.totalRuns
         if (totalDeliveryRuns % 2 === 1) {
           const tmp      = inn.striker
@@ -210,7 +210,7 @@ export function processDelivery(innings, delivery) {
   } else {
     // Extras (wide/no-ball) — only rotate strike on odd runs from extras
     const extRuns = type === DELIVERY_TYPES.WIDE ? runs : runs
-    if (extRuns % 2 === 1) {
+    if (extRuns % 2 === 1 && inn.nonStriker) {
       const tmp      = inn.striker
       inn.striker    = inn.nonStriker
       inn.nonStriker = tmp

@@ -160,7 +160,11 @@ export default function UmpireUI() {
     }
 
     const result = processDelivery(innings, annotated)
-    const { innings: newInnings, needsNewBatsman, needsNewBowler } = result
+    let newInnings = result.innings
+    const { needsNewBatsman, needsNewBowler } = result
+    const battingPlayerIds = (newInnings.battingTeam === 'teamA'
+      ? match.teamA?.playerIds
+      : match.teamB?.playerIds) || []
 
     if (inningsIdx === 1) {
       const target = (match.innings?.[0]?.runs || 0) + 1
@@ -174,7 +178,7 @@ export default function UmpireUI() {
     }
 
     // Check innings complete
-    const complete = isInningsComplete(newInnings, match.overs)
+    const complete = isInningsComplete(newInnings, match.overs, battingPlayerIds.length || 10)
 
     if (complete) {
       if (inningsIdx === 1) {
@@ -194,8 +198,29 @@ export default function UmpireUI() {
     }
 
     if (needsNewBatsman) {
+      const availableBatsmen = battingPlayerIds.filter(uid =>
+        uid !== newInnings.striker
+        && uid !== newInnings.nonStriker
+        && !newInnings.batting?.[uid]?.isOut
+      )
+
+      if (availableBatsmen.length === 0) {
+        const remainingBatter = [newInnings.striker, newInnings.nonStriker]
+          .find(uid => uid && !newInnings.batting?.[uid]?.isOut)
+        if (remainingBatter) {
+          newInnings = { ...newInnings, striker: remainingBatter, nonStriker: null }
+          await saveInnings(newInnings)
+          toast('Last batter continues alone')
+          return
+        }
+      }
+
       // Save first, then prompt
       await saveInnings(newInnings)
+      if (availableBatsmen.length === 0) {
+        setShowEnd(true)
+        return
+      }
       setTimeout(() => setShowBatsman(true), 400)
       return
     }
@@ -207,7 +232,7 @@ export default function UmpireUI() {
     }
 
     await saveInnings(newInnings)
-  }, [innings, saving, match, saveInnings])
+  }, [innings, inningsIdx, saving, match, saveInnings])
 
   // ── Run button tap ────────────────────────────────────────────────
   const handleRunButton = (runs) => {
@@ -237,7 +262,9 @@ export default function UmpireUI() {
 
   // ── Wicket ────────────────────────────────────────────────────────
   const handleWicketConfirm = () => {
-    const dismissed = dismissedBatter === 'striker' ? innings.striker : innings.nonStriker
+    const dismissed = dismissedBatter === 'nonStriker' && innings.nonStriker
+      ? innings.nonStriker
+      : innings.striker
     handleDelivery({
       type:           DELIVERY_TYPES.NORMAL,
       runs:           0,
@@ -493,7 +520,7 @@ export default function UmpireUI() {
           {[
             { uid: innings.striker,    label: 'Striker *' },
             { uid: innings.nonStriker, label: 'Non-Striker' },
-          ].map(({ uid, label }) => {
+          ].filter(({ uid }) => uid).map(({ uid, label }) => {
             const bat = innings.batting?.[uid]
             return (
               <div key={uid} className="bg-midnight-100 border border-border rounded-xl p-3">
@@ -631,7 +658,7 @@ export default function UmpireUI() {
           <div>
             <p className="text-white/50 text-xs mb-2">Dismissed Batter</p>
             <div className="flex gap-2">
-              {['striker', 'nonStriker'].map(side => (
+              {['striker', 'nonStriker'].filter(side => side === 'striker' || Boolean(innings?.nonStriker)).map(side => (
                 <button
                   key={side}
                   onClick={() => setDismissedBatter(side)}
@@ -720,7 +747,6 @@ export default function UmpireUI() {
         <div className="space-y-2">
           <p className="text-white/40 text-xs mb-3">Select bowler for next over</p>
           {(innings?.bowlingTeam === 'teamA' ? match.teamA?.playerIds : match.teamB?.playerIds || [])
-            .filter(uid => uid !== innings?.currentBowler) // can't bowl consecutive
             .map(uid => {
               const bwl = innings?.bowling?.[uid]
               return (
@@ -734,11 +760,9 @@ export default function UmpireUI() {
                     <Avatar name={players[uid]?.name} size="sm" />
                     <span className="text-white font-medium">{players[uid]?.name || uid}</span>
                   </div>
-                  {bwl && (
-                    <span className="text-sapphire-light text-xs font-semibold">
-                      {bwl.wickets}/{bwl.runs} ({Math.floor(bwl.balls / 6)}.{bwl.balls % 6} ov)
-                    </span>
-                  )}
+                  <span className="text-sapphire-light text-xs font-semibold">
+                    {bwl?.wickets ?? 0}/{bwl?.runs ?? 0} ({Math.floor((bwl?.balls ?? 0) / 6)}.{(bwl?.balls ?? 0) % 6} ov)
+                  </span>
                 </button>
               )
             })}
