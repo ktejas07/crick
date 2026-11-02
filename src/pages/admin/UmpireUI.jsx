@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { doc, onSnapshot, updateDoc, collection, getDocs } from 'firebase/firestore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { RotateCcw, ChevronRight, Zap } from 'lucide-react'
+import { RotateCcw, ArrowLeftRight, ChevronRight, Zap } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { db } from '../../firebase'
 import AppLayout from '../../components/Layout/AppLayout'
@@ -83,6 +83,10 @@ export default function UmpireUI() {
   const [tossChoice, setTossChoice] = useState('bat')
   const [openingStriker, setOpeningStriker] = useState('')
   const [openingNonStriker, setOpeningNonStriker] = useState('')
+  const [openingBowler, setOpeningBowler] = useState('')
+  const [innings2Striker, setInnings2Striker] = useState('')
+  const [innings2NonStriker, setInnings2NonStriker] = useState('')
+  const [innings2Bowler, setInnings2Bowler] = useState('')
 
   // ── Listen to match ───────────────────────────────────────────────
   useEffect(() => {
@@ -116,12 +120,37 @@ export default function UmpireUI() {
   const openingPlayerIds = tossBattingTeam === 'teamA'
     ? (match?.teamA?.playerIds || [])
     : (match?.teamB?.playerIds || [])
+  const openingBowlingTeam = tossBattingTeam === 'teamA' ? 'teamB' : 'teamA'
+  const openingBowlerIds = openingBowlingTeam === 'teamA'
+    ? (match?.teamA?.playerIds || [])
+    : (match?.teamB?.playerIds || [])
   const openingStrikerId = openingPlayerIds.includes(openingStriker)
     ? openingStriker
     : openingPlayerIds[0] || ''
   const openingNonStrikerId = openingPlayerIds.includes(openingNonStriker) && openingNonStriker !== openingStrikerId
     ? openingNonStriker
     : openingPlayerIds.find(uid => uid !== openingStrikerId) || ''
+  const openingBowlerId = openingBowlerIds.includes(openingBowler)
+    ? openingBowler
+    : openingBowlerIds[0] || ''
+
+  const innings2BattingTeam = innings?.battingTeam === 'teamA' ? 'teamB' : 'teamA'
+  const innings2BowlingTeam = innings?.battingTeam || 'teamA'
+  const innings2BattingIds = innings2BattingTeam === 'teamA'
+    ? (match?.teamA?.playerIds || [])
+    : (match?.teamB?.playerIds || [])
+  const innings2BowlingIds = innings2BowlingTeam === 'teamA'
+    ? (match?.teamA?.playerIds || [])
+    : (match?.teamB?.playerIds || [])
+  const innings2StrikerId = innings2BattingIds.includes(innings2Striker)
+    ? innings2Striker
+    : innings2BattingIds[0] || ''
+  const innings2NonStrikerId = innings2BattingIds.includes(innings2NonStriker) && innings2NonStriker !== innings2StrikerId
+    ? innings2NonStriker
+    : innings2BattingIds.find(uid => uid !== innings2StrikerId) || ''
+  const innings2BowlerId = innings2BowlingIds.includes(innings2Bowler)
+    ? innings2Bowler
+    : innings2BowlingIds[0] || ''
 
   const currentOverBalls = innings ? getCurrentOverBalls(innings) : []
   const slots            = Array.from({ length: 6 }, (_, i) => currentOverBalls[i] || null)
@@ -303,6 +332,16 @@ export default function UmpireUI() {
     toast.success(`${getPlayerName(uid)} to bowl`)
   }
 
+  const handleSwapBatsmen = async () => {
+    if (!innings?.striker || !innings?.nonStriker || saving) return
+    const saved = await saveInnings({
+      ...innings,
+      striker: innings.nonStriker,
+      nonStriker: innings.striker,
+    })
+    if (saved) toast.success('Striker and non-striker swapped')
+  }
+
   // ── Toss setup ────────────────────────────────────────────────────
   const handleTossConfirm = async () => {
     const battingTeam = tossChoice === 'bat' ? tossWinner : (tossWinner === 'teamA' ? 'teamB' : 'teamA')
@@ -318,10 +357,14 @@ export default function UmpireUI() {
     const firstBatsman2  = openingPlayerIds.includes(openingNonStrikerId) && openingNonStrikerId !== firstBatsman1
       ? openingNonStrikerId
       : battingPlayerIds.find(uid => uid !== firstBatsman1)
-    const firstBowler    = bowlingPlayerIds[0]
+    const firstBowler = openingBowlerIds.includes(openingBowlerId) ? openingBowlerId : ''
 
     if (!firstBatsman1 || !firstBatsman2 || firstBatsman1 === firstBatsman2) {
       toast.error('Select two different opening batsmen')
+      return
+    }
+    if (!firstBowler) {
+      toast.error('Select an opening bowler')
       return
     }
 
@@ -344,10 +387,20 @@ export default function UmpireUI() {
       const battingTeam = prevBatting === 'teamA' ? 'teamB' : 'teamA'
       const bowlingTeam = prevBatting
 
-      const battingIds = battingTeam === 'teamA' ? match.teamA.playerIds : match.teamB.playerIds
-      const bowlingIds = bowlingTeam === 'teamA' ? match.teamA.playerIds : match.teamB.playerIds
+      const battingIds = battingTeam === 'teamA' ? match.teamA?.playerIds || [] : match.teamB?.playerIds || []
+      const bowlingIds = bowlingTeam === 'teamA' ? match.teamA?.playerIds || [] : match.teamB?.playerIds || []
+      const striker = battingIds.includes(innings2StrikerId) ? innings2StrikerId : ''
+      const nonStriker = battingIds.includes(innings2NonStrikerId) && innings2NonStrikerId !== striker
+        ? innings2NonStrikerId
+        : ''
+      const bowler = bowlingIds.includes(innings2BowlerId) ? innings2BowlerId : ''
 
-      const newInnings2 = createInnings(battingTeam, bowlingTeam, battingIds[0], battingIds[1], bowlingIds[0])
+      if (!striker || !nonStriker || !bowler) {
+        toast.error('Select two opening batsmen and an opening bowler')
+        return
+      }
+
+      const newInnings2 = createInnings(battingTeam, bowlingTeam, striker, nonStriker, bowler)
 
       const newAllInnings = [innings, newInnings2]
       await updateDoc(doc(db, 'matches', matchId), {
@@ -434,6 +487,7 @@ export default function UmpireUI() {
                     onChange={event => setOpeningStriker(event.target.value)}
                     className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
                   >
+                    {openingPlayerIds.length === 0 && <option value="">No players available</option>}
                     {openingPlayerIds.map(uid => (
                       <option key={uid} value={uid}>{getPlayerName(uid)}</option>
                     ))}
@@ -446,7 +500,23 @@ export default function UmpireUI() {
                     onChange={event => setOpeningNonStriker(event.target.value)}
                     className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
                   >
+                    {openingPlayerIds.filter(uid => uid !== openingStrikerId).length === 0 && (
+                      <option value="">No other batter available</option>
+                    )}
                     {openingPlayerIds.filter(uid => uid !== openingStrikerId).map(uid => (
+                      <option key={uid} value={uid}>{getPlayerName(uid)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="min-w-0 col-span-2">
+                  <span className="text-white/60 text-xs font-semibold">Opening bowler</span>
+                  <select
+                    value={openingBowlerId}
+                    onChange={event => setOpeningBowler(event.target.value)}
+                    className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
+                  >
+                    {openingBowlerIds.length === 0 && <option value="">No players available</option>}
+                    {openingBowlerIds.map(uid => (
                       <option key={uid} value={uid}>{getPlayerName(uid)}</option>
                     ))}
                   </select>
@@ -534,6 +604,18 @@ export default function UmpireUI() {
             )
           })}
         </div>
+        {innings.nonStriker && (
+          <button
+            type="button"
+            onClick={handleSwapBatsmen}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-border bg-midnight-100
+                       py-2.5 text-sm font-semibold text-white/70 transition-all hover:border-gold hover:text-gold
+                       disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ArrowLeftRight size={16} /> Swap striker and non-striker
+          </button>
+        )}
 
         {/* Bowler */}
         {innings.currentBowler && (
@@ -777,6 +859,51 @@ export default function UmpireUI() {
               ? `${battingTeamName}: ${innings?.runs}/${innings?.wickets} (${innings?.oversCompleted}.${innings?.ballsInCurrentOver} ov)`
               : 'Ready to complete the match?'}
           </p>
+          {match.status === 'innings1' && (
+            <div className="grid grid-cols-2 gap-3 text-left">
+              <label className="min-w-0">
+                <span className="text-white/60 text-xs font-semibold">Opening striker</span>
+                <select
+                  value={innings2StrikerId}
+                  onChange={event => setInnings2Striker(event.target.value)}
+                  className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
+                >
+                  {innings2BattingIds.length === 0 && <option value="">No players available</option>}
+                  {innings2BattingIds.map(uid => (
+                    <option key={uid} value={uid}>{getPlayerName(uid)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="min-w-0">
+                <span className="text-white/60 text-xs font-semibold">Opening non-striker</span>
+                <select
+                  value={innings2NonStrikerId}
+                  onChange={event => setInnings2NonStriker(event.target.value)}
+                  className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
+                >
+                  {innings2BattingIds.filter(uid => uid !== innings2StrikerId).length === 0 && (
+                    <option value="">No other batter available</option>
+                  )}
+                  {innings2BattingIds.filter(uid => uid !== innings2StrikerId).map(uid => (
+                    <option key={uid} value={uid}>{getPlayerName(uid)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="min-w-0 col-span-2">
+                <span className="text-white/60 text-xs font-semibold">Opening bowler</span>
+                <select
+                  value={innings2BowlerId}
+                  onChange={event => setInnings2Bowler(event.target.value)}
+                  className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
+                >
+                  {innings2BowlingIds.length === 0 && <option value="">No players available</option>}
+                  {innings2BowlingIds.map(uid => (
+                    <option key={uid} value={uid}>{getPlayerName(uid)}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
           <Button fullWidth size="lg" onClick={handleEndInnings}>
             {match.status === 'innings1' ? 'Start 2nd Innings' : 'Complete Match 🏆'}
           </Button>
@@ -788,4 +915,3 @@ export default function UmpireUI() {
     </AppLayout>
   )
 }
-
