@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { doc, onSnapshot, updateDoc, collection, getDocs } from 'firebase/firestore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { RotateCcw, ArrowLeftRight, ChevronRight, Zap } from 'lucide-react'
+import { RotateCcw, ArrowLeftRight, ChevronRight, Pencil, Zap } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { db } from '../../firebase'
 import AppLayout from '../../components/Layout/AppLayout'
@@ -66,6 +66,7 @@ export default function UmpireUI() {
   const [showWicket,   setShowWicket]   = useState(false)
   const [showBatsman,  setShowBatsman]  = useState(false)
   const [showBowler,   setShowBowler]   = useState(false)
+  const [batsmanToReplace, setBatsmanToReplace] = useState('')
   const [showToss,     setShowToss]     = useState(false)
   const [showEnd,      setShowEnd]      = useState(false)
 
@@ -318,10 +319,16 @@ export default function UmpireUI() {
 
   // ── Select next batsman ───────────────────────────────────────────
   const handleSelectBatsman = async (uid) => {
-    const newInn = { ...innings, striker: uid }
-    await saveInnings(newInn)
+    const newInn = {
+      ...innings,
+      [batsmanToReplace || 'striker']: uid,
+    }
+    const saved = await saveInnings(newInn)
+    if (!saved) return
     setShowBatsman(false)
-    toast.success(`${getPlayerName(uid)} is in`)
+    const replacing = Boolean(batsmanToReplace)
+    setBatsmanToReplace('')
+    toast.success(replacing ? `${getPlayerName(uid)} replaces the batter` : `${getPlayerName(uid)} is in`)
   }
 
   // ── Select next bowler ────────────────────────────────────────────
@@ -548,6 +555,9 @@ export default function UmpireUI() {
   // ── LIVE UMPIRE UI ────────────────────────────────────────────────
   const battingTeamName = innings?.battingTeam === 'teamA' ? match.teamA?.name : match.teamB?.name
   const target = inningsIdx === 1 ? (match.innings?.[0]?.runs || 0) + 1 : null
+  const currentBowlerHasBowled = Boolean(
+    innings?.balls?.some(ball => ball.bowler === innings.currentBowler)
+  )
 
   return (
     <AppLayout title="⚡ Umpire" backTo="/admin" hideNav>
@@ -600,6 +610,20 @@ export default function UmpireUI() {
                   {bat?.runs ?? 0}
                   <span className="text-white/30"> ({bat?.balls ?? 0}b)</span>
                 </p>
+                {(bat?.runs ?? 0) === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBatsmanToReplace(uid === innings.striker ? 'striker' : 'nonStriker')
+                      setShowBatsman(true)
+                    }}
+                    disabled={saving}
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-white/50
+                               hover:text-gold disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Pencil size={12} /> Change
+                  </button>
+                )}
               </div>
             )
           })}
@@ -623,6 +647,17 @@ export default function UmpireUI() {
             <div>
               <p className="text-white/30 text-[10px] uppercase">Bowling</p>
               <p className="text-sapphire-light font-bold text-sm">{getPlayerName(innings.currentBowler)}</p>
+              {!currentBowlerHasBowled && (
+                <button
+                  type="button"
+                  onClick={() => setShowBowler(true)}
+                  disabled={saving}
+                  className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-white/50
+                             hover:text-sapphire-light disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Pencil size={12} /> Change
+                </button>
+              )}
             </div>
             {(() => {
               const bwl = innings.bowling?.[innings.currentBowler]
@@ -802,13 +837,22 @@ export default function UmpireUI() {
       </Modal>
 
       {/* ── SELECT BATSMAN MODAL ── */}
-      <Modal isOpen={showBatsman} onClose={() => setShowBatsman(false)} title="New Batsman">
+      <Modal
+        isOpen={showBatsman}
+        onClose={() => {
+          setShowBatsman(false)
+          setBatsmanToReplace('')
+        }}
+        title={batsmanToReplace ? 'Change Batsman' : 'New Batsman'}
+      >
         <div className="space-y-2">
-          <p className="text-white/40 text-xs mb-3">Select the incoming batsman</p>
+          <p className="text-white/40 text-xs mb-3">
+            {batsmanToReplace ? 'Select a replacement who has not batted yet' : 'Select the incoming batsman'}
+          </p>
           {(innings?.battingTeam === 'teamA' ? match.teamA?.playerIds : match.teamB?.playerIds || [])
             .filter(uid => {
               const bat = innings?.batting?.[uid]
-              return !bat?.isOut && uid !== innings?.striker && uid !== innings?.nonStriker
+              return !bat && uid !== innings?.striker && uid !== innings?.nonStriker
             })
             .map(uid => (
               <button
@@ -825,9 +869,15 @@ export default function UmpireUI() {
       </Modal>
 
       {/* ── SELECT BOWLER MODAL ── */}
-      <Modal isOpen={showBowler} onClose={() => setShowBowler(false)} title="New Bowler">
+      <Modal
+        isOpen={showBowler}
+        onClose={() => setShowBowler(false)}
+        title={currentBowlerHasBowled ? 'New Bowler' : 'Change Bowler'}
+      >
         <div className="space-y-2">
-          <p className="text-white/40 text-xs mb-3">Select bowler for next over</p>
+          <p className="text-white/40 text-xs mb-3">
+            {currentBowlerHasBowled ? 'Select bowler for next over' : 'Select a bowler before the first delivery'}
+          </p>
           {(innings?.bowlingTeam === 'teamA' ? match.teamA?.playerIds : match.teamB?.playerIds || [])
             .map(uid => {
               const bwl = innings?.bowling?.[uid]
