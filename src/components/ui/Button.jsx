@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { clsx } from 'clsx'
 
 const variants = {
@@ -30,10 +30,12 @@ export default function Button({
   type = 'button',
   ...props
 }) {
+  const reduceMotion = useReducedMotion()
   return (
     <motion.button
       type={type}
       whileTap={{ scale: disabled || loading ? 1 : 0.95 }}
+      whileHover={!reduceMotion && !disabled && !loading ? { y: -1 } : undefined}
       onClick={onClick}
       disabled={disabled || loading}
       className={clsx(
@@ -53,4 +55,3 @@ export default function Button({
     </motion.button>
   )
 }
-

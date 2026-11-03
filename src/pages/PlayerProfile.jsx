@@ -13,6 +13,7 @@ import Spinner from '../components/ui/Spinner'
 import Button from '../components/ui/Button'
 import ProfilePhotoCropper from '../components/ProfilePhotoCropper'
 import { aggregatePlayerStats, getPlayerMatchStats } from '../utils/statsHelper'
+import { getPlayerRating } from '../utils/playerRating'
 import useAuthStore from '../store/useAuthStore'
 
 function StatBox({ label, value, sub, color = 'text-white' }) {
@@ -38,6 +39,7 @@ export default function PlayerProfile() {
   const [showPhotoPreview, setShowPhotoPreview] = useState(false)
   const photoInput = useRef(null)
   const isOwnProfile = user?.uid === id
+  const playerRating = stats ? getPlayerRating(stats) : null
 
   const handlePhotoChange = async (event) => {
     const file = event.target.files?.[0]
@@ -157,6 +159,7 @@ export default function PlayerProfile() {
           <div className="flex items-center justify-center gap-2 mt-1">
             <Badge variant="sapphire">🏏 Player</Badge>
             <Badge variant="muted">{stats?.totalMatches || 0} matches</Badge>
+            <Badge variant="gold">{playerRating === null ? 'Unrated' : `${playerRating}/10`}</Badge>
           </div>
         </motion.div>
 

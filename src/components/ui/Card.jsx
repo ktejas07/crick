@@ -1,12 +1,14 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { clsx } from 'clsx'
 
 export default function Card({ children, className = '', glow = false, hover = false, animate = true, onClick, ...props }) {
+  const reduceMotion = useReducedMotion()
   const Comp = animate ? motion.div : 'div'
   const motionProps = animate ? {
     initial: { opacity: 0, y: 12 },
     animate: { opacity: 1, y: 0 },
     transition: { duration: 0.25 },
+    whileHover: hover && !reduceMotion ? { y: -3, scale: 1.01 } : undefined,
   } : {}
 
   return (
@@ -27,4 +29,3 @@ export default function Card({ children, className = '', glow = false, hover = f
     </Comp>
   )
 }
-
