@@ -52,6 +52,7 @@ service cloud.firestore {
         && request.resource.data.name is string
         && request.resource.data.stats is map
         && (!request.resource.data.keys().hasAny(['photoURL'])
+          || request.resource.data.photoURL == null
           || (request.resource.data.photoURL is string
             && request.resource.data.photoURL.size() <= 350000));
       allow update: if isAdmin()

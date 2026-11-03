@@ -10,28 +10,34 @@ import { auth, db } from '../firebase'
 
 const MAX_PROFILE_PHOTO_BYTES = 240 * 1024
 
-async function createProfilePhotoDataUrl(file) {
+async function createProfilePhotoDataUrl(file, crop) {
   const image = await createImageBitmap(file)
   try {
-    for (const dimension of [256, 192, 128]) {
-      const scale = Math.min(1, dimension / Math.max(image.width, image.height))
+    const dimension = 256
+    const scale = Math.max(dimension / image.width, dimension / image.height)
+    const zoom = Math.max(1, Math.min(3, crop.zoom))
+    const offsetScale = dimension / crop.previewSize
+    const width = image.width * scale * zoom
+    const height = image.height * scale * zoom
+    const x = (dimension - width) / 2 + crop.offsetX * offsetScale
+    const y = (dimension - height) / 2 + crop.offsetY * offsetScale
+
+    for (const quality of [0.82, 0.68, 0.54, 0.4]) {
       const canvas = document.createElement('canvas')
-      canvas.width = Math.max(1, Math.round(image.width * scale))
-      canvas.height = Math.max(1, Math.round(image.height * scale))
+      canvas.width = dimension
+      canvas.height = dimension
       const context = canvas.getContext('2d')
       if (!context) throw new Error('Your browser could not process this image.')
-      context.drawImage(image, 0, 0, canvas.width, canvas.height)
+      context.drawImage(image, x, y, width, height)
 
-      for (const quality of [0.82, 0.68, 0.54, 0.4]) {
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality))
-        if (blob && blob.size <= MAX_PROFILE_PHOTO_BYTES) {
-          return await new Promise((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(reader.result)
-            reader.onerror = () => reject(reader.error || new Error('Could not read the compressed photo.'))
-            reader.readAsDataURL(blob)
-          })
-        }
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality))
+      if (blob && blob.size <= MAX_PROFILE_PHOTO_BYTES) {
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result)
+          reader.onerror = () => reject(reader.error || new Error('Could not read the compressed photo.'))
+          reader.readAsDataURL(blob)
+        })
       }
     }
   } finally {
@@ -82,7 +88,12 @@ const useAuthStore = create((set, get) => ({
     return unsubscribe
   },
 
-  saveProfilePhoto: async (file) => {
+  saveProfilePhoto: async (file, crop = {
+    zoom: 1,
+    offsetX: 0,
+    offsetY: 0,
+    previewSize: 256,
+  }) => {
     const { user } = get()
     if (!user) throw new Error('You must be signed in to upload a profile photo.')
     if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
@@ -92,7 +103,7 @@ const useAuthStore = create((set, get) => ({
       throw new Error('The image must be 5 MB or smaller.')
     }
 
-    const photoURL = await createProfilePhotoDataUrl(file)
+    const photoURL = await createProfilePhotoDataUrl(file, crop)
     const batch = writeBatch(db)
     batch.update(doc(db, 'users', user.uid), { photoURL, photoPath: deleteField() })
     batch.update(doc(db, 'players', user.uid), { photoURL })

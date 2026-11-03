@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore'
 import { motion } from 'framer-motion'
-import { ImagePlus } from 'lucide-react'
+import { ImagePlus, X } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { db } from '../firebase'
 import AppLayout from '../components/Layout/AppLayout'
@@ -11,6 +11,7 @@ import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
 import Button from '../components/ui/Button'
+import ProfilePhotoCropper from '../components/ProfilePhotoCropper'
 import { aggregatePlayerStats, getPlayerMatchStats } from '../utils/statsHelper'
 import useAuthStore from '../store/useAuthStore'
 
@@ -33,6 +34,8 @@ export default function PlayerProfile() {
   const [matchHistory, setMatchHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [cropFile, setCropFile] = useState(null)
+  const [showPhotoPreview, setShowPhotoPreview] = useState(false)
   const photoInput = useRef(null)
   const isOwnProfile = user?.uid === id
 
@@ -40,11 +43,25 @@ export default function PlayerProfile() {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Choose a JPG, PNG, or WebP image.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('The image must be 5 MB or smaller.')
+      return
+    }
 
+    setCropFile(file)
+  }
+
+  const handleCropSave = async (crop) => {
+    if (!cropFile) return
     setUploadingPhoto(true)
     try {
-      const result = await saveProfilePhoto(file)
+      const result = await saveProfilePhoto(cropFile, crop)
       setProfile(current => ({ ...current, photoURL: result.photoURL }))
+      setCropFile(null)
       toast.success('Profile photo updated')
     } catch (error) {
       toast.error(error.message || 'Could not update profile photo')
@@ -103,7 +120,18 @@ export default function PlayerProfile() {
         >
           {/* Glow */}
           <div className="absolute inset-0 bg-gradient-to-t from-sapphire/5 to-transparent pointer-events-none" />
-          <Avatar name={profile.name} photoURL={profile.photoURL} size="xl" className="mx-auto mb-3" />
+          {profile.photoURL ? (
+            <button
+              type="button"
+              onClick={() => setShowPhotoPreview(true)}
+              className="mx-auto mb-3 block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              aria-label={`Preview ${profile.name}'s profile photo`}
+            >
+              <Avatar name={profile.name} photoURL={profile.photoURL} size="xl" />
+            </button>
+          ) : (
+            <Avatar name={profile.name} size="xl" className="mx-auto mb-3" />
+          )}
           <h1 className="font-display font-bold text-2xl text-white">{profile.name}</h1>
           {isOwnProfile && (
             <>
@@ -202,6 +230,35 @@ export default function PlayerProfile() {
           </section>
         )}
       </div>
+      {cropFile && (
+        <ProfilePhotoCropper
+          file={cropFile}
+          onClose={() => setCropFile(null)}
+          onSave={handleCropSave}
+          saving={uploadingPhoto}
+        />
+      )}
+      {showPhotoPreview && profile.photoURL && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-5"
+          onClick={() => setShowPhotoPreview(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setShowPhotoPreview(false)}
+            className="absolute right-5 top-5 rounded-full bg-black/50 p-2 text-white"
+            aria-label="Close photo preview"
+          >
+            <X size={22} />
+          </button>
+          <img
+            src={profile.photoURL}
+            alt={`${profile.name}'s profile photo`}
+            onClick={event => event.stopPropagation()}
+            className="max-h-[85vh] max-w-full rounded-xl object-contain"
+          />
+        </div>
+      )}
     </AppLayout>
   )
 }

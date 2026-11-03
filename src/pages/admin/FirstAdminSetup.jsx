@@ -4,6 +4,7 @@ import { ShieldCheck } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import useAuthStore from '../../store/useAuthStore'
 import Button from '../../components/ui/Button'
+import ProfilePhotoCropper from '../../components/ProfilePhotoCropper'
 
 export default function FirstAdminSetup() {
   const { user, profile, claimFirstAdmin, saveProfilePhoto, logout } = useAuthStore()
@@ -18,28 +19,11 @@ export default function FirstAdminSetup() {
       setError('Enter your name to finish account setup.')
       return
     }
-    if (photoFile && !['image/jpeg', 'image/png', 'image/webp'].includes(photoFile.type)) {
-      setError('Choose a JPG, PNG, or WebP image.')
-      return
-    }
-    if (photoFile && photoFile.size > 5 * 1024 * 1024) {
-      setError('The image must be 5 MB or smaller.')
-      return
-    }
 
     setSaving(true)
     setError('')
     try {
       await claimFirstAdmin(name)
-      if (photoFile) {
-        try {
-          await saveProfilePhoto(photoFile)
-          toast.success('Admin profile photo updated')
-        } catch (photoError) {
-          console.error('Admin setup succeeded, but profile photo upload failed', photoError)
-          toast.error(`Admin setup completed, but photo upload failed: ${photoError.message}`)
-        }
-      }
     } catch (err) {
       setError(err.code === 'permission-denied'
         ? 'Firestore denied setup. Publish the current firestore.rules, then try again.'
@@ -47,6 +31,50 @@ export default function FirstAdminSetup() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const finishSetupWithPhoto = async (crop) => {
+    if (!profile && !name.trim()) {
+      setError('Enter your name to finish account setup.')
+      setPhotoFile(null)
+      return
+    }
+
+    setSaving(true)
+    setError('')
+    try {
+      await claimFirstAdmin(name)
+      try {
+        await saveProfilePhoto(photoFile, crop)
+        toast.success('Admin profile photo updated')
+      } catch (photoError) {
+        console.error('Admin setup succeeded, but profile photo upload failed', photoError)
+        toast.error(`Admin setup completed, but photo upload failed: ${photoError.message}`)
+      }
+    } catch (err) {
+      setError(err.code === 'permission-denied'
+        ? 'Firestore denied setup. Publish the current firestore.rules, then try again.'
+        : err.message || 'Could not complete admin setup.')
+      setPhotoFile(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePhotoSelection = (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Choose a JPG, PNG, or WebP image.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('The image must be 5 MB or smaller.')
+      return
+    }
+    setError('')
+    setPhotoFile(file)
   }
 
   return (
@@ -90,7 +118,7 @@ export default function FirstAdminSetup() {
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            onChange={event => setPhotoFile(event.target.files?.[0] || null)}
+            onChange={handlePhotoSelection}
             disabled={saving}
             className="mt-1.5 block w-full text-sm text-white/50 file:mr-3 file:rounded-lg file:border-0
                        file:bg-gold/15 file:px-3 file:py-2 file:text-gold"
@@ -108,6 +136,14 @@ export default function FirstAdminSetup() {
           Sign out
         </button>
       </motion.section>
+      {photoFile && (
+        <ProfilePhotoCropper
+          file={photoFile}
+          onClose={() => setPhotoFile(null)}
+          onSave={finishSetupWithPhoto}
+          saving={saving}
+        />
+      )}
     </main>
   )
 }
