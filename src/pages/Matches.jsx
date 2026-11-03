@@ -11,6 +11,7 @@ const FILTERS = ['All', 'Live', 'Upcoming', 'Completed']
 
 export default function Matches() {
   const [matches, setMatches] = useState([])
+  const [players, setPlayers] = useState({})
   const [loading, setLoading] = useState(true)
   const [filter, setFilter]   = useState('All')
 
@@ -20,7 +21,10 @@ export default function Matches() {
       setMatches(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     })
-    return unsub
+    const unsubscribePlayers = onSnapshot(collection(db, 'players'), snap => {
+      setPlayers(Object.fromEntries(snap.docs.map(player => [player.id, player.data()])))
+    })
+    return () => { unsub(); unsubscribePlayers() }
   }, [])
 
   const filtered = matches.filter(m => {
@@ -68,7 +72,7 @@ export default function Matches() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
               >
-                <MatchCard match={m} id={m.id} />
+                <MatchCard match={m} id={m.id} players={players} />
               </motion.div>
             ))}
           </div>
@@ -77,4 +81,3 @@ export default function Matches() {
     </AppLayout>
   )
 }
-

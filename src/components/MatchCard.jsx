@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Trophy, Clock, Play, CheckCircle } from 'lucide-react'
 import Badge from './ui/Badge'
+import CompletedMatchSummary from './CompletedMatchSummary'
 
 const statusConfig = {
   scheduled: { label: 'Scheduled', variant: 'muted',   icon: Clock,        color: 'text-white/50' },
@@ -11,7 +12,7 @@ const statusConfig = {
   completed: { label: 'Completed', variant: 'sapphire',icon: CheckCircle,  color: 'text-sapphire-light' },
 }
 
-export default function MatchCard({ match, id }) {
+export default function MatchCard({ match, id, players }) {
   const cfg = statusConfig[match.status] || statusConfig.scheduled
   const Icon = cfg.icon
 
@@ -42,47 +43,52 @@ export default function MatchCard({ match, id }) {
           </Badge>
         </div>
 
-        {/* Teams */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-sapphire/20 flex items-center justify-center">
-              <span className="text-xs font-bold text-sapphire-light">A</span>
-            </div>
-            <span className="text-sm font-semibold text-white">{match.teamA?.name || 'Team A'}</span>
-          </div>
+        {match.status === 'completed' ? (
+          <CompletedMatchSummary match={match} players={players} compact />
+        ) : (
+          <>
+            {/* Teams */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-sapphire/20 flex items-center justify-center">
+                  <span className="text-xs font-bold text-sapphire-light">A</span>
+                </div>
+                <span className="text-sm font-semibold text-white">{match.teamA?.name || 'Team A'}</span>
+              </div>
 
-          <span className="text-white/30 text-xs font-bold">VS</span>
+              <span className="text-white/30 text-xs font-bold">VS</span>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-white">{match.teamB?.name || 'Team B'}</span>
-            <div className="w-8 h-8 rounded-lg bg-gold/20 flex items-center justify-center">
-              <span className="text-xs font-bold text-gold">B</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-white">{match.teamB?.name || 'Team B'}</span>
+                <div className="w-8 h-8 rounded-lg bg-gold/20 flex items-center justify-center">
+                  <span className="text-xs font-bold text-gold">B</span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Live score preview */}
-        {inn && (
-          <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Icon size={12} className={cfg.color} />
-              <span className="text-xs text-white/50">
-                {inn.battingTeam === 'teamA' ? match.teamA?.name : match.teamB?.name}
-              </span>
-            </div>
-            <span className="font-display font-bold text-white text-sm">
-              {inn.runs}/{inn.wickets}
-              <span className="text-white/40 text-xs ml-1">({inn.oversCompleted}.{inn.ballsInCurrentOver})</span>
-            </span>
-          </div>
+            {/* Live score preview */}
+            {inn && (
+              <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Icon size={12} className={cfg.color} />
+                  <span className="text-xs text-white/50">
+                    {inn.battingTeam === 'teamA' ? match.teamA?.name : match.teamB?.name}
+                  </span>
+                </div>
+                <span className="font-display font-bold text-white text-sm">
+                  {inn.runs}/{inn.wickets}
+                  <span className="text-white/40 text-xs ml-1">({inn.oversCompleted}.{inn.ballsInCurrentOver})</span>
+                </span>
+              </div>
+            )}
+          </>
         )}
 
         {/* Result */}
-        {match.result && (
+        {match.result && match.status !== 'completed' && (
           <p className="mt-2 text-xs text-gold font-semibold">{match.result}</p>
         )}
       </motion.div>
     </Link>
   )
 }
-

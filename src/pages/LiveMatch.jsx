@@ -13,11 +13,12 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
 import Avatar from '../components/ui/Avatar'
+import CompletedMatchSummary from '../components/CompletedMatchSummary'
 import { formatOvers, strikeRate } from '../utils/cricketEngine'
 
 export default function LiveMatch() {
   const { id } = useParams()
-  const { profile, isAdmin } = useAuthStore()
+  const { isAdmin } = useAuthStore()
   const [match, setMatch]   = useState(null)
   const [players, setPlayers] = useState({})
   const [loading, setLoading] = useState(true)
@@ -83,28 +84,30 @@ export default function LiveMatch() {
         </div>
 
         {/* Teams banner */}
-        <div className="flex items-center justify-between bg-midnight-200 rounded-2xl p-4 border border-border">
-          <div className="text-center flex-1">
-            <div className="w-10 h-10 rounded-xl bg-sapphire/20 flex items-center justify-center mx-auto mb-1">
-              <span className="text-sapphire-light font-bold text-sm">A</span>
+        {match.status !== 'completed' && (
+          <div className="flex items-center justify-between bg-midnight-200 rounded-2xl p-4 border border-border">
+            <div className="text-center flex-1">
+              <div className="w-10 h-10 rounded-xl bg-sapphire/20 flex items-center justify-center mx-auto mb-1">
+                <span className="text-sapphire-light font-bold text-sm">A</span>
+              </div>
+              <p className="font-display font-bold text-white text-sm">{match.teamA?.name}</p>
+              <p className="text-white/30 text-xs">{match.teamA?.playerIds?.length || 0} players</p>
             </div>
-            <p className="font-display font-bold text-white text-sm">{match.teamA?.name}</p>
-            <p className="text-white/30 text-xs">{match.teamA?.playerIds?.length || 0} players</p>
-          </div>
-          <div className="px-4">
-            <span className="text-white/30 font-bold text-sm">VS</span>
-          </div>
-          <div className="text-center flex-1">
-            <div className="w-10 h-10 rounded-xl bg-gold/20 flex items-center justify-center mx-auto mb-1">
-              <span className="text-gold font-bold text-sm">B</span>
+            <div className="px-4">
+              <span className="text-white/30 font-bold text-sm">VS</span>
             </div>
-            <p className="font-display font-bold text-white text-sm">{match.teamB?.name}</p>
-            <p className="text-white/30 text-xs">{match.teamB?.playerIds?.length || 0} players</p>
+            <div className="text-center flex-1">
+              <div className="w-10 h-10 rounded-xl bg-gold/20 flex items-center justify-center mx-auto mb-1">
+                <span className="text-gold font-bold text-sm">B</span>
+              </div>
+              <p className="font-display font-bold text-white text-sm">{match.teamB?.name}</p>
+              <p className="text-white/30 text-xs">{match.teamB?.playerIds?.length || 0} players</p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Toss result */}
-        {match.toss && (
+        {match.toss && match.status !== 'completed' && (
           <p className="text-center text-xs text-white/40">
             {match.toss.winner === 'teamA' ? match.teamA?.name : match.teamB?.name} won the toss and chose to{' '}
             <span className="text-gold font-semibold">{match.toss.choice}</span>
@@ -112,12 +115,19 @@ export default function LiveMatch() {
         )}
 
         {/* Live Scoreboard */}
-        {currentInnings && (
+        {currentInnings && match.status !== 'completed' && (
           <Scoreboard match={match} inningsIndex={inningsIdx} />
         )}
 
+        {match.status === 'completed' && (
+          <Card animate={false}>
+            <h3 className="font-display font-bold text-white">Match summary</h3>
+            <CompletedMatchSummary match={match} players={players} />
+          </Card>
+        )}
+
         {/* Second innings summary (if in innings2) */}
-        {(match.status === 'innings2' || match.status === 'completed') && match.innings?.[0] && (
+        {match.status === 'innings2' && match.innings?.[0] && (
           <Card animate={false} className="text-sm">
             <p className="text-white/40 text-xs mb-1">1st Innings</p>
             <div className="flex justify-between">
@@ -135,7 +145,7 @@ export default function LiveMatch() {
         )}
 
         {/* Current Players at Crease */}
-        {currentInnings && (isLive || match.status === 'completed') && (
+        {currentInnings && isLive && (
           <Card animate={false}>
             <p className="text-white/40 text-xs uppercase tracking-widest mb-3">At the Crease</p>
             <div className="space-y-2">
@@ -171,7 +181,7 @@ export default function LiveMatch() {
         )}
 
         {/* Bowling */}
-        {currentInnings?.currentBowler && (isLive || match.status === 'completed') && (
+        {currentInnings?.currentBowler && isLive && (
           <Card animate={false}>
             <p className="text-white/40 text-xs uppercase tracking-widest mb-2">Bowling</p>
             {(() => {
@@ -196,12 +206,12 @@ export default function LiveMatch() {
         )}
 
         {/* Ball feed */}
-        {currentInnings && (
+        {currentInnings && isLive && (
           <BallFeed innings={currentInnings} players={players} />
         )}
 
         {/* Result */}
-        {match.result && (
+        {match.result && match.status !== 'completed' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}

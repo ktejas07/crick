@@ -41,6 +41,7 @@ export default function Scoreboard({ match, inningsIndex = 0 }) {
   const isSecondInnings = inningsIndex === 1
   const target = isSecondInnings ? (match.innings?.[0]?.runs || 0) + 1 : null
   const needed = target ? target - innings.runs : null
+  const isChasing = isSecondInnings && match.status === 'innings2'
 
   return (
     <div className="bg-gradient-to-br from-midnight-300 to-midnight-200 border border-border rounded-2xl p-4 space-y-3">
@@ -75,7 +76,7 @@ export default function Scoreboard({ match, inningsIndex = 0 }) {
           <p className="text-white/50 text-sm mt-1">Overs: {overs}</p>
         </div>
 
-        {isSecondInnings && needed !== null && needed > 0 && (
+        {isChasing && needed !== null && needed > 0 && (
           <div className="ml-auto text-right pb-1">
             <p className="text-gold font-display font-bold text-xl">{needed} needed</p>
             <p className="text-white/40 text-xs">
@@ -83,7 +84,7 @@ export default function Scoreboard({ match, inningsIndex = 0 }) {
             </p>
           </div>
         )}
-        {isSecondInnings && needed !== null && needed <= 0 && (
+        {isChasing && needed !== null && needed <= 0 && (
           <div className="ml-auto">
             <span className="text-success font-bold">Won! 🎉</span>
           </div>
@@ -102,4 +103,3 @@ export default function Scoreboard({ match, inningsIndex = 0 }) {
     </div>
   )
 }
-

@@ -15,6 +15,7 @@ import { aggregatePlayerStats, getPlayerMatchStats } from '../utils/statsHelper'
 export default function Dashboard() {
   const { user, profile } = useAuthStore()
   const [matches, setMatches]   = useState([])
+  const [players, setPlayers] = useState({})
   const [loading, setLoading]   = useState(true)
 
   // Real-time matches listener
@@ -30,6 +31,10 @@ export default function Dashboard() {
     })
     return unsub
   }, [])
+
+  useEffect(() => onSnapshot(collection(db, 'players'), snap => {
+    setPlayers(Object.fromEntries(snap.docs.map(player => [player.id, player.data()])))
+  }), [])
 
   const liveMatches  = matches.filter(m => m.status === 'innings1' || m.status === 'innings2')
   const upcomingMatches = matches.filter(m => m.status === 'scheduled' || m.status === 'toss')
@@ -86,7 +91,7 @@ export default function Dashboard() {
               <AnimatePresence>
                 {liveMatches.map(match => (
                   <motion.div key={match.id} layout>
-                    <MatchCard match={match} id={match.id} />
+                    <MatchCard match={match} id={match.id} players={players} />
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -105,7 +110,7 @@ export default function Dashboard() {
             </div>
             <div className="space-y-3">
               {myMatches.slice(0, 3).map(match => (
-                <MatchCard key={match.id} match={match} id={match.id} />
+                <MatchCard key={match.id} match={match} id={match.id} players={players} />
               ))}
             </div>
           </section>
@@ -137,7 +142,7 @@ export default function Dashboard() {
             </div>
             <div className="space-y-3">
               {upcomingMatches.slice(0, 3).map(m => (
-                <MatchCard key={m.id} match={m} id={m.id} />
+                <MatchCard key={m.id} match={m} id={m.id} players={players} />
               ))}
             </div>
           </section>
@@ -162,4 +167,3 @@ export default function Dashboard() {
     </AppLayout>
   )
 }
-
