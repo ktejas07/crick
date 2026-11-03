@@ -213,7 +213,7 @@ export default function AdminPanel() {
                 <Link to={`/player/${p.id}`}>
                   <div className="flex items-center gap-3 bg-card border border-border rounded-xl p-3
                                   hover:border-sapphire/40 transition-all">
-                    <Avatar name={p.name} size="sm" />
+                    <Avatar name={p.name} photoURL={p.photoURL} size="sm" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-white truncate text-sm">{p.name}</p>

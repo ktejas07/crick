@@ -78,7 +78,7 @@ export default function Players() {
                     return (
                   <div className="flex items-center gap-3 bg-card border border-border rounded-xl p-3
                                   hover:border-sapphire/40 hover:bg-midnight-300 transition-all duration-200">
-                    <Avatar name={p.name} size="md" />
+                    <Avatar name={p.name} photoURL={p.photoURL} size="md" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-white truncate">{p.name}</p>
@@ -111,4 +111,3 @@ export default function Players() {
     </AppLayout>
   )
 }
-

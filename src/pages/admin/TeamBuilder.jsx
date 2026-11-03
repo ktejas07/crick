@@ -136,7 +136,7 @@ export default function TeamBuilder() {
                         exit={{ opacity: 0, scale: 0.8 }}
                         className="flex items-center gap-1.5 bg-midnight-200 rounded-lg px-2 py-1.5"
                       >
-                        <Avatar name={p.name} size="xs" />
+                        <Avatar name={p.name} photoURL={p.photoURL} size="xs" />
                         <span className="text-xs text-white font-medium truncate flex-1">{p.name}</span>
                         <button
                           onClick={() => removeFromTeam(team, p.id)}
@@ -167,7 +167,7 @@ export default function TeamBuilder() {
             )}
             {unassigned.map(p => (
               <div key={p.id} className="flex items-center gap-3 bg-midnight-100 border border-border rounded-xl px-3 py-2.5">
-                <Avatar name={p.name} size="sm" />
+                <Avatar name={p.name} photoURL={p.photoURL} size="sm" />
                 <span className="text-sm text-white font-medium flex-1">{p.name}</span>
                 <div className="flex gap-1.5">
                   <button
@@ -206,4 +206,3 @@ export default function TeamBuilder() {
     </AppLayout>
   )
 }
-

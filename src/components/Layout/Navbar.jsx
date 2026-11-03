@@ -59,7 +59,7 @@ export default function Navbar({ title, backTo }) {
                 onClick={() => setShowMenu(v => !v)}
                 className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-midnight-300 transition-colors"
               >
-                <Avatar name={profile?.name} size="xs" />
+                <Avatar name={profile?.name} photoURL={profile?.photoURL} size="xs" />
                 <span className="text-xs text-white/60 font-medium hidden sm:block">
                   {profile?.name?.split(' ')[0]}
                 </span>
@@ -76,7 +76,7 @@ export default function Navbar({ title, backTo }) {
                     className="flex items-center gap-2 px-4 py-3 text-sm text-white hover:bg-midnight-300 transition-colors"
                     onClick={() => setShowMenu(false)}
                   >
-                    <Avatar name={profile?.name} size="xs" />
+                    <Avatar name={profile?.name} photoURL={profile?.photoURL} size="xs" />
                     My Profile
                   </Link>
                   <hr className="border-border" />
@@ -96,4 +96,3 @@ export default function Navbar({ title, backTo }) {
     </header>
   )
 }
-

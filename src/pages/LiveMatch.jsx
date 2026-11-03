@@ -145,7 +145,7 @@ export default function LiveMatch() {
                   <Link key={uid} to={`/player/${uid}`}>
                     <div className="flex items-center justify-between py-1">
                       <div className="flex items-center gap-2">
-                        <Avatar name={getPlayerName(uid)} size="xs" />
+                        <Avatar name={players[uid]?.name || getPlayerName(uid)} photoURL={players[uid]?.photoURL} size="xs" />
                         <div>
                           <p className="text-sm text-white font-medium">
                             {getPlayerName(uid)}
@@ -180,7 +180,7 @@ export default function LiveMatch() {
               return (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Avatar name={getPlayerName(uid)} size="xs" />
+                    <Avatar name={players[uid]?.name || getPlayerName(uid)} photoURL={players[uid]?.photoURL} size="xs" />
                     <p className="text-sm text-white font-medium">{getPlayerName(uid)}</p>
                   </div>
                   <p className="font-display font-bold text-white text-sm">
@@ -215,4 +215,3 @@ export default function LiveMatch() {
     </AppLayout>
   )
 }
-

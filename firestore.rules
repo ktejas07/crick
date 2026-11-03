@@ -31,6 +31,11 @@ service cloud.firestore {
         && (request.resource.data.role == 'player'
           || (request.resource.data.role == 'admin' && isFirstAdminClaim(uid)));
       allow update: if isAdmin()
+        || (isSignedIn()
+          && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoURL', 'photoPath'])
+          && request.resource.data.photoURL is string
+          && request.resource.data.photoURL.size() <= 350000)
         || (isFirstAdminClaim(uid)
           && resource.data.role == 'player'
           && request.resource.data.role == 'admin'
@@ -43,10 +48,19 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn()
         && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'stats', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['name', 'stats', 'createdAt', 'photoURL'])
         && request.resource.data.name is string
-        && request.resource.data.stats is map;
-      allow update, delete: if isAdmin();
+        && request.resource.data.stats is map
+        && (!request.resource.data.keys().hasAny(['photoURL'])
+          || (request.resource.data.photoURL is string
+            && request.resource.data.photoURL.size() <= 350000));
+      allow update: if isAdmin()
+        || (isSignedIn()
+          && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoURL'])
+          && request.resource.data.photoURL is string
+          && request.resource.data.photoURL.size() <= 350000);
+      allow delete: if isAdmin();
     }
 
     match /system/{document} {
@@ -68,4 +82,3 @@ service cloud.firestore {
     }
   }
 }
-

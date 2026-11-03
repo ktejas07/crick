@@ -861,7 +861,7 @@ export default function UmpireUI() {
                 className="w-full flex items-center gap-3 bg-midnight-200 border border-border rounded-xl px-4 py-3
                            hover:border-gold hover:bg-midnight-300 transition-all text-left"
               >
-                <Avatar name={players[uid]?.name} size="sm" />
+                <Avatar name={players[uid]?.name} photoURL={players[uid]?.photoURL} size="sm" />
                 <span className="text-white font-medium">{players[uid]?.name || uid}</span>
               </button>
             ))}
@@ -889,7 +889,7 @@ export default function UmpireUI() {
                              rounded-xl px-4 py-3 hover:border-sapphire hover:bg-midnight-300 transition-all"
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar name={players[uid]?.name} size="sm" />
+                    <Avatar name={players[uid]?.name} photoURL={players[uid]?.photoURL} size="sm" />
                     <span className="text-white font-medium">{players[uid]?.name || uid}</span>
                   </div>
                   <span className="text-sapphire-light text-xs font-semibold">

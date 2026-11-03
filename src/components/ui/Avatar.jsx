@@ -1,4 +1,5 @@
 import { clsx } from 'clsx'
+import { useEffect, useState } from 'react'
 
 const colors = [
   'from-gold to-gold-bright',
@@ -21,7 +22,8 @@ function initials(name = '') {
     .join('')
 }
 
-export default function Avatar({ name = '', size = 'md', className = '' }) {
+export default function Avatar({ name = '', photoURL, size = 'md', className = '' }) {
+  const [imageFailed, setImageFailed] = useState(false)
   const s = {
     xs:   'w-7 h-7 text-xs',
     sm:   'w-9 h-9 text-sm',
@@ -30,16 +32,24 @@ export default function Avatar({ name = '', size = 'md', className = '' }) {
     xl:   'w-20 h-20 text-2xl',
   }
   const gradient = getColor(name)
+  useEffect(() => setImageFailed(false), [photoURL])
+
   return (
     <div className={clsx(
       s[size],
-      'rounded-full flex items-center justify-center font-display font-bold text-midnight',
+      'rounded-full flex items-center justify-center font-display font-bold text-midnight overflow-hidden',
       `bg-gradient-to-br ${gradient}`,
       'flex-shrink-0',
       className,
     )}>
-      {initials(name)}
+      {photoURL && !imageFailed ? (
+        <img
+          src={photoURL}
+          alt={`${name || 'Player'} profile`}
+          className="w-full h-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : initials(name)}
     </div>
   )
 }
-

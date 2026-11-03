@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore'
 import { motion } from 'framer-motion'
+import { ImagePlus } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 import { db } from '../firebase'
 import AppLayout from '../components/Layout/AppLayout'
 import Avatar from '../components/ui/Avatar'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Spinner from '../components/ui/Spinner'
+import Button from '../components/ui/Button'
 import { aggregatePlayerStats, getPlayerMatchStats } from '../utils/statsHelper'
 import useAuthStore from '../store/useAuthStore'
 
@@ -24,10 +27,31 @@ function StatBox({ label, value, sub, color = 'text-white' }) {
 export default function PlayerProfile() {
   const { id } = useParams()
   const user = useAuthStore(state => state.user)
+  const saveProfilePhoto = useAuthStore(state => state.saveProfilePhoto)
   const [profile, setProfile] = useState(null)
   const [stats, setStats]     = useState(null)
   const [matchHistory, setMatchHistory] = useState([])
   const [loading, setLoading] = useState(true)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const photoInput = useRef(null)
+  const isOwnProfile = user?.uid === id
+
+  const handlePhotoChange = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setUploadingPhoto(true)
+    try {
+      const result = await saveProfilePhoto(file)
+      setProfile(current => ({ ...current, photoURL: result.photoURL }))
+      toast.success('Profile photo updated')
+    } catch (error) {
+      toast.error(error.message || 'Could not update profile photo')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -79,8 +103,29 @@ export default function PlayerProfile() {
         >
           {/* Glow */}
           <div className="absolute inset-0 bg-gradient-to-t from-sapphire/5 to-transparent pointer-events-none" />
-          <Avatar name={profile.name} size="xl" className="mx-auto mb-3" />
+          <Avatar name={profile.name} photoURL={profile.photoURL} size="xl" className="mx-auto mb-3" />
           <h1 className="font-display font-bold text-2xl text-white">{profile.name}</h1>
+          {isOwnProfile && (
+            <>
+              <input
+                ref={photoInput}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={handlePhotoChange}
+                disabled={uploadingPhoto}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                loading={uploadingPhoto}
+                onClick={() => photoInput.current?.click()}
+                className="mt-3"
+              >
+                <ImagePlus size={14} /> {profile.photoURL ? 'Change photo' : 'Add photo'}
+              </Button>
+            </>
+          )}
           <div className="flex items-center justify-center gap-2 mt-1">
             <Badge variant="sapphire">🏏 Player</Badge>
             <Badge variant="muted">{stats?.totalMatches || 0} matches</Badge>
@@ -160,4 +205,3 @@ export default function PlayerProfile() {
     </AppLayout>
   )
 }
-

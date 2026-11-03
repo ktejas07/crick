@@ -5,8 +5,41 @@ import {
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth'
-import { doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore'
+import { deleteField, doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore'
 import { auth, db } from '../firebase'
+
+const MAX_PROFILE_PHOTO_BYTES = 240 * 1024
+
+async function createProfilePhotoDataUrl(file) {
+  const image = await createImageBitmap(file)
+  try {
+    for (const dimension of [256, 192, 128]) {
+      const scale = Math.min(1, dimension / Math.max(image.width, image.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(image.width * scale))
+      canvas.height = Math.max(1, Math.round(image.height * scale))
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('Your browser could not process this image.')
+      context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+      for (const quality of [0.82, 0.68, 0.54, 0.4]) {
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality))
+        if (blob && blob.size <= MAX_PROFILE_PHOTO_BYTES) {
+          return await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result)
+            reader.onerror = () => reject(reader.error || new Error('Could not read the compressed photo.'))
+            reader.readAsDataURL(blob)
+          })
+        }
+      }
+    }
+  } finally {
+    image.close()
+  }
+
+  throw new Error('Could not compress this image enough. Try a smaller photo.')
+}
 
 const useAuthStore = create((set, get) => ({
   user: null,          // Firebase Auth user object
@@ -49,6 +82,29 @@ const useAuthStore = create((set, get) => ({
     return unsubscribe
   },
 
+  saveProfilePhoto: async (file) => {
+    const { user } = get()
+    if (!user) throw new Error('You must be signed in to upload a profile photo.')
+    if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      throw new Error('Choose a JPG, PNG, or WebP image.')
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error('The image must be 5 MB or smaller.')
+    }
+
+    const photoURL = await createProfilePhotoDataUrl(file)
+    const batch = writeBatch(db)
+    batch.update(doc(db, 'users', user.uid), { photoURL, photoPath: deleteField() })
+    batch.update(doc(db, 'players', user.uid), { photoURL })
+    await batch.commit()
+
+    set(state => ({
+      profile: { ...state.profile, photoURL, photoPath: undefined },
+    }))
+
+    return { photoURL }
+  },
+
   // Refresh profile from Firestore (after role change etc.)
   refreshProfile: async () => {
     const { user } = get()
@@ -64,6 +120,7 @@ const useAuthStore = create((set, get) => ({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       role: 'player',
+      photoURL: null,
       createdAt: serverTimestamp(),
       notifications: [],
       stats: {
@@ -79,6 +136,7 @@ const useAuthStore = create((set, get) => ({
     batch.set(doc(db, 'users', cred.user.uid), profile)
     batch.set(doc(db, 'players', cred.user.uid), {
       name: profile.name,
+      photoURL: profile.photoURL,
       stats: profile.stats,
       createdAt,
     })
@@ -122,6 +180,7 @@ const useAuthStore = create((set, get) => ({
         name: name.trim(),
         email: user.email || '',
         role: 'admin',
+        photoURL: null,
         createdAt,
         notifications: [],
         stats: {
@@ -135,6 +194,7 @@ const useAuthStore = create((set, get) => ({
       batch.set(userRef, adminProfile)
       batch.set(doc(db, 'players', user.uid), {
         name: adminProfile.name,
+        photoURL: adminProfile.photoURL,
         stats: adminProfile.stats,
         createdAt,
       })
@@ -157,4 +217,3 @@ const useAuthStore = create((set, get) => ({
 }))
 
 export default useAuthStore
-

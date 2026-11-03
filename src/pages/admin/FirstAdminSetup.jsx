@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ShieldCheck } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 import useAuthStore from '../../store/useAuthStore'
 import Button from '../../components/ui/Button'
 
 export default function FirstAdminSetup() {
-  const { user, profile, claimFirstAdmin, logout } = useAuthStore()
+  const { user, profile, claimFirstAdmin, saveProfilePhoto, logout } = useAuthStore()
   const isExistingAdmin = profile?.role === 'admin'
   const [name, setName] = useState(profile?.name || '')
+  const [photoFile, setPhotoFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -16,11 +18,28 @@ export default function FirstAdminSetup() {
       setError('Enter your name to finish account setup.')
       return
     }
+    if (photoFile && !['image/jpeg', 'image/png', 'image/webp'].includes(photoFile.type)) {
+      setError('Choose a JPG, PNG, or WebP image.')
+      return
+    }
+    if (photoFile && photoFile.size > 5 * 1024 * 1024) {
+      setError('The image must be 5 MB or smaller.')
+      return
+    }
 
     setSaving(true)
     setError('')
     try {
       await claimFirstAdmin(name)
+      if (photoFile) {
+        try {
+          await saveProfilePhoto(photoFile)
+          toast.success('Admin profile photo updated')
+        } catch (photoError) {
+          console.error('Admin setup succeeded, but profile photo upload failed', photoError)
+          toast.error(`Admin setup completed, but photo upload failed: ${photoError.message}`)
+        }
+      }
     } catch (err) {
       setError(err.code === 'permission-denied'
         ? 'Firestore denied setup. Publish the current firestore.rules, then try again.'
@@ -66,6 +85,18 @@ export default function FirstAdminSetup() {
             <span className="block mt-2 text-white/35 text-xs">{user?.email}</span>
           </label>
         )}
+        <label className="block mt-5">
+          <span className="text-white/70 text-sm font-medium">Profile photo (optional)</span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={event => setPhotoFile(event.target.files?.[0] || null)}
+            disabled={saving}
+            className="mt-1.5 block w-full text-sm text-white/50 file:mr-3 file:rounded-lg file:border-0
+                       file:bg-gold/15 file:px-3 file:py-2 file:text-gold"
+          />
+          <span className="block mt-1 text-white/30 text-xs">JPG, PNG, or WebP; up to 5 MB.</span>
+        </label>
         {error && <p role="alert" className="mt-4 text-danger text-sm">{error}</p>}
         <Button fullWidth size="lg" onClick={handleSetup} loading={saving} className="mt-6">
           {isExistingAdmin ? 'Finish admin setup' : 'Claim first admin role'}
