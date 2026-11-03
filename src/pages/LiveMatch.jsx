@@ -7,13 +7,13 @@ import { db } from '../firebase'
 import useAuthStore from '../store/useAuthStore'
 import AppLayout from '../components/Layout/AppLayout'
 import Scoreboard from '../components/Scoreboard'
-import BallFeed from '../components/BallFeed'
 import Badge from '../components/ui/Badge'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
 import Avatar from '../components/ui/Avatar'
 import CompletedMatchSummary from '../components/CompletedMatchSummary'
+import InningsScorecard from '../components/InningsScorecard'
 import { formatOvers, strikeRate } from '../utils/cricketEngine'
 
 export default function LiveMatch() {
@@ -126,6 +126,16 @@ export default function LiveMatch() {
           </Card>
         )}
 
+        {match.innings?.map((innings, index) => (
+          <InningsScorecard
+            key={`${match.id}-innings-${index}`}
+            innings={innings}
+            index={index}
+            match={match}
+            players={players}
+          />
+        ))}
+
         {/* Second innings summary (if in innings2) */}
         {match.status === 'innings2' && match.innings?.[0] && (
           <Card animate={false} className="text-sm">
@@ -203,11 +213,6 @@ export default function LiveMatch() {
               )
             })()}
           </Card>
-        )}
-
-        {/* Ball feed */}
-        {currentInnings && isLive && (
-          <BallFeed innings={currentInnings} players={players} />
         )}
 
         {/* Result */}

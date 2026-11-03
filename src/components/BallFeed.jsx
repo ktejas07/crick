@@ -21,7 +21,7 @@ function BallChip({ ball }) {
   )
 }
 
-export default function BallFeed({ innings, players = {} }) {
+export default function BallFeed({ innings, players = {}, showAll = false }) {
   if (!innings?.balls?.length) return null
 
   // Group by over
@@ -36,9 +36,11 @@ export default function BallFeed({ innings, players = {} }) {
 
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-white/50 uppercase tracking-widest">Ball by Ball</h3>
+      <h3 className="text-sm font-semibold text-white/50 uppercase tracking-widest">
+        {showAll ? 'Ball-by-ball detail' : 'Ball by Ball'}
+      </h3>
       <AnimatePresence initial={false}>
-        {overKeys.slice(0, 5).map(overKey => {
+        {(showAll ? overKeys : overKeys.slice(0, 5)).map(overKey => {
           const balls = overGroups[overKey]
           const bowlerUid = balls[balls.length - 1]?.bowler
           const bowlerName = players[bowlerUid]?.name || 'Bowler'
@@ -63,4 +65,3 @@ export default function BallFeed({ innings, players = {} }) {
     </div>
   )
 }
-
