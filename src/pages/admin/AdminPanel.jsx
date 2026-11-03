@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc } from 'firebase/firestore'
+import { useNavigate, Link } from 'react-router-dom'
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore'
 import { motion } from 'framer-motion'
-import { Plus, Trash2, Shield, Users, Trophy } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Plus, Trash2, Shield, Users, Trophy, Copy } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { db } from '../../firebase'
+import useAuthStore from '../../store/useAuthStore'
 import AppLayout from '../../components/Layout/AppLayout'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -13,10 +14,13 @@ import Avatar from '../../components/ui/Avatar'
 import Spinner from '../../components/ui/Spinner'
 
 export default function AdminPanel() {
+  const { user } = useAuthStore()
+  const navigate = useNavigate()
   const [matches, setMatches] = useState([])
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab]         = useState('matches') // 'matches' | 'players'
+  const [rematchLoadingId, setRematchLoadingId] = useState(null)
 
   useEffect(() => {
     const unsub1 = onSnapshot(
@@ -36,6 +40,47 @@ export default function AdminPanel() {
       await deleteDoc(doc(db, 'matches', id))
       toast.success('Match deleted')
     } catch { toast.error('Failed to delete match') }
+  }
+
+  const createRematch = async (match) => {
+    if (!user?.uid) {
+      toast.error('Please sign in again to create a match')
+      return
+    }
+
+    setRematchLoadingId(match.id)
+    try {
+      const teamA = {
+        name: match.teamA?.name || 'Team A',
+        playerIds: Array.isArray(match.teamA?.playerIds) ? [...match.teamA.playerIds] : [],
+      }
+      const teamB = {
+        name: match.teamB?.name || 'Team B',
+        playerIds: Array.isArray(match.teamB?.playerIds) ? [...match.teamB.playerIds] : [],
+      }
+      const matchRef = await addDoc(collection(db, 'matches'), {
+        title: `${match.title || `${teamA.name} vs ${teamB.name}`} (Rematch)`,
+        venue: match.venue || 'TBD',
+        overs: match.overs || 10,
+        status: 'scheduled',
+        teamA,
+        teamB,
+        innings: [],
+        toss: null,
+        result: null,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        notifiedPlayers: [],
+      })
+
+      toast.success('New match created with the same teams')
+      navigate(`/admin/match/${matchRef.id}/teams`)
+    } catch (error) {
+      console.error('Failed to create match with reused teams', error)
+      toast.error('Failed to create a new match')
+    } finally {
+      setRematchLoadingId(null)
+    }
   }
 
   return (
@@ -100,6 +145,19 @@ export default function AdminPanel() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-white/60">{m.teamA?.name} vs {m.teamB?.name}</span>
                   </div>
+
+                  {m.teamA?.playerIds?.length > 0 && m.teamB?.playerIds?.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      fullWidth
+                      loading={rematchLoadingId === m.id}
+                      disabled={rematchLoadingId !== null}
+                      onClick={() => createRematch(m)}
+                    >
+                      <Copy size={13} /> Reuse Teams for New Match
+                    </Button>
+                  )}
 
                   {/* Action buttons */}
                   <div className="flex gap-2 pt-1">
@@ -177,4 +235,3 @@ export default function AdminPanel() {
     </AppLayout>
   )
 }
-
