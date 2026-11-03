@@ -66,8 +66,11 @@ function PlayerStats({ innings, match, battingTeamKey, players }) {
           const stats = innings.batting?.[uid]
           return (
             <div key={uid} className="grid grid-cols-[minmax(0,1fr)_36px_36px_40px_38px] gap-1 border-t border-border/40 px-4 py-2.5 text-right text-xs">
-              <span className="truncate text-left font-medium text-white">
-                {nameOf(uid)}{uid === innings.striker || uid === innings.nonStriker ? <span className="ml-1 text-gold">●</span> : ''}
+              <span className="flex min-w-0 items-center gap-1 text-left font-medium text-white">
+                <span className="truncate">{nameOf(uid)}</span>
+                {uid === innings.striker && (
+                  <span className="shrink-0 text-sm text-gold" role="img" aria-label="On strike" title="On strike">🏏</span>
+                )}
               </span>
               <span className="font-bold text-white">{stats?.runs ?? '—'}</span>
               <span className="text-white/55">{stats?.balls ?? '—'}</span>
