@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { doc, onSnapshot, updateDoc, collection, getDocs } from 'firebase/firestore'
+import { doc, onSnapshot, collection, getDocs, writeBatch } from 'firebase/firestore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { RotateCcw, ArrowLeftRight, ChevronRight, Pencil, Zap } from 'lucide-react'
 import { toast } from 'react-hot-toast'
@@ -22,6 +22,7 @@ import {
   DELIVERY_TYPES,
   WICKET_TYPES,
 } from '../../utils/cricketEngine'
+import { createPublicMatchView } from '../../utils/publicMatch'
 
 // ─── Button configs ──────────────────────────────────────────────────────────
 const RUN_BUTTONS = [
@@ -156,6 +157,21 @@ export default function UmpireUI() {
   const currentOverBalls = innings ? getCurrentOverBalls(innings) : []
   const slots            = Array.from({ length: 6 }, (_, i) => currentOverBalls[i] || null)
 
+  const persistMatchUpdates = useCallback(async (updates) => {
+    const batch = writeBatch(db)
+    batch.update(doc(db, 'matches', matchId), updates)
+    if (match?.publicShareCode) {
+      const playerNames = Object.fromEntries(
+        Object.entries(players).map(([uid, player]) => [uid, player.name])
+      )
+      batch.set(
+        doc(db, 'publicMatches', match.publicShareCode),
+        createPublicMatchView({ ...match, ...updates }, matchId, playerNames)
+      )
+    }
+    await batch.commit()
+  }, [match, matchId, players])
+
   // ── Persist innings to Firestore ──────────────────────────────────
   const saveInnings = useCallback(async (updatedInnings, extraUpdates = {}) => {
     setSaving(true)
@@ -163,7 +179,7 @@ export default function UmpireUI() {
       const updatedMatch = { ...match }
       const newInnings   = [...(updatedMatch.innings || [])]
       newInnings[inningsIdx] = updatedInnings
-      await updateDoc(doc(db, 'matches', matchId), {
+      await persistMatchUpdates({
         innings: newInnings,
         ...extraUpdates,
       })
@@ -175,7 +191,7 @@ export default function UmpireUI() {
     } finally {
       setSaving(false)
     }
-  }, [match, inningsIdx, matchId])
+  }, [match, inningsIdx, matchId, persistMatchUpdates])
 
   // ── Handle delivery ───────────────────────────────────────────────
   const handleDelivery = useCallback(async (delivery) => {
@@ -377,13 +393,18 @@ export default function UmpireUI() {
 
     const newInnings = createInnings(battingTeam, bowlingTeam, firstBatsman1, firstBatsman2, firstBowler)
 
-    await updateDoc(doc(db, 'matches', matchId), {
-      status:  'innings1',
-      toss:    { winner: tossWinner, choice: tossChoice },
-      innings: [newInnings],
-    })
-    setShowToss(false)
-    toast.success('Match started! 🏏')
+    try {
+      await persistMatchUpdates({
+        status:  'innings1',
+        toss:    { winner: tossWinner, choice: tossChoice },
+        innings: [newInnings],
+      })
+      setShowToss(false)
+      toast.success('Match started! 🏏')
+    } catch (error) {
+      console.error('Failed to start match', error)
+      toast.error('Could not start the match. Please try again.')
+    }
   }
 
   // ── End innings / start innings2 ──────────────────────────────────
@@ -410,25 +431,35 @@ export default function UmpireUI() {
       const newInnings2 = createInnings(battingTeam, bowlingTeam, striker, nonStriker, bowler)
 
       const newAllInnings = [innings, newInnings2]
-      await updateDoc(doc(db, 'matches', matchId), {
-        innings: newAllInnings,
-        status: 'innings2',
-      })
-      setShowEnd(false)
-      toast.success('Innings 2 started!')
+      try {
+        await persistMatchUpdates({
+          innings: newAllInnings,
+          status: 'innings2',
+        })
+        setShowEnd(false)
+        toast.success('Innings 2 started!')
+      } catch (error) {
+        console.error('Failed to start second innings', error)
+        toast.error('Could not start the next innings. Please try again.')
+      }
     } else {
       // Complete match — determine result
       const inn1 = match.innings[0]
       const inn2 = innings
       const result = getMatchResult(inn1, inn2, match.teamA.name, match.teamB.name)
 
-      await updateDoc(doc(db, 'matches', matchId), {
-        innings: match.innings.map((inn, i) => i === inningsIdx ? innings : inn),
-        status: 'completed',
-        result,
-      })
-      setShowEnd(false)
-      toast.success('Match completed! 🏆')
+      try {
+        await persistMatchUpdates({
+          innings: match.innings.map((inn, i) => i === inningsIdx ? innings : inn),
+          status: 'completed',
+          result,
+        })
+        setShowEnd(false)
+        toast.success('Match completed! 🏆')
+      } catch (error) {
+        console.error('Failed to complete match', error)
+        toast.error('Could not complete the match. Please try again.')
+      }
     }
   }
 

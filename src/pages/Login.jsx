@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Radio } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import useAuthStore from '../store/useAuthStore'
 import Button from '../components/ui/Button'
@@ -12,6 +12,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading]   = useState(false)
+  const [watchCode, setWatchCode] = useState('')
   const { login } = useAuthStore()
   const navigate = useNavigate()
 
@@ -30,6 +31,16 @@ export default function Login() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleWatch = (e) => {
+    e.preventDefault()
+    const code = watchCode.trim().toUpperCase()
+    if (!/^[A-HJ-NP-Z2-9]{12}$/.test(code)) {
+      toast.error('Enter a valid 12-character match code')
+      return
+    }
+    navigate(`/watch/${code}`)
   }
 
   return (
@@ -111,8 +122,29 @@ export default function Login() {
             </Link>
           </p>
         </div>
+
+        <form onSubmit={handleWatch} className="mt-4 rounded-2xl border border-border bg-midnight-200/80 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Radio size={16} className="text-gold" />
+            <div>
+              <p className="text-sm font-semibold text-white">Watch a live match</p>
+              <p className="text-[11px] text-white/40">No account needed · Enter the shared match code</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={watchCode}
+              onChange={event => setWatchCode(event.target.value.toUpperCase())}
+              maxLength={12}
+              autoCapitalize="characters"
+              placeholder="12-character code"
+              aria-label="Match share code"
+              className="min-w-0 flex-1 rounded-xl border border-border bg-midnight-100 px-3 py-2.5 font-mono text-sm tracking-widest text-white placeholder:font-sans placeholder:tracking-normal placeholder:text-white/25 focus:border-gold focus:outline-none"
+            />
+            <Button type="submit" variant="secondary">Watch</Button>
+          </div>
+        </form>
       </motion.div>
     </div>
   )
 }
-

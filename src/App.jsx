@@ -18,6 +18,7 @@ import CreateMatch  from './pages/admin/CreateMatch'
 import TeamBuilder  from './pages/admin/TeamBuilder'
 import UmpireUI     from './pages/admin/UmpireUI'
 import FirstAdminSetup from './pages/admin/FirstAdminSetup'
+import PublicLiveMatch from './pages/PublicLiveMatch'
 
 export default function App() {
   const { init, initialized, user, bootstrapComplete } = useAuthStore()
@@ -44,6 +45,7 @@ export default function App() {
       >
         <Routes location={location}>
           {/* Public / Guest routes */}
+          <Route path="/watch/:code" element={<PublicLiveMatch />} />
           <Route path="/login"    element={<GuestRoute><Login /></GuestRoute>} />
           <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
 

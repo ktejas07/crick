@@ -81,5 +81,18 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
+
+    // Public score-only projection. The random document ID acts as a share code.
+    match /publicMatches/{shareCode} {
+      allow get: if shareCode.matches('^[A-HJ-NP-Z2-9]{12}$');
+      allow list: if false;
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly([
+          'matchId', 'title', 'venue', 'overs', 'status', 'teamA', 'teamB', 'innings', 'toss', 'result'
+        ])
+        && request.resource.data.matchId is string
+        && request.resource.data.status in ['scheduled', 'toss', 'innings1', 'innings2', 'completed'];
+      allow delete: if isAdmin();
+    }
   }
 }

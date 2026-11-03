@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, addDoc, serverTimestamp, getDoc, writeBatch, deleteField } from 'firebase/firestore'
 import { motion } from 'framer-motion'
-import { Plus, Trash2, Shield, Users, Trophy, Copy } from 'lucide-react'
+import { Plus, Trash2, Shield, Users, Trophy, Copy, Link2, Unlink } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { db } from '../../firebase'
 import useAuthStore from '../../store/useAuthStore'
@@ -12,6 +12,7 @@ import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Avatar from '../../components/ui/Avatar'
 import Spinner from '../../components/ui/Spinner'
+import { createPublicMatchView, generateMatchShareCode } from '../../utils/publicMatch'
 
 export default function AdminPanel() {
   const { user } = useAuthStore()
@@ -21,6 +22,7 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab]         = useState('matches') // 'matches' | 'players'
   const [rematchLoadingId, setRematchLoadingId] = useState(null)
+  const [shareLoadingId, setShareLoadingId] = useState(null)
 
   useEffect(() => {
     const unsub1 = onSnapshot(
@@ -37,9 +39,86 @@ export default function AdminPanel() {
   const deleteMatch = async (id) => {
     if (!window.confirm('Delete this match? This cannot be undone.')) return
     try {
-      await deleteDoc(doc(db, 'matches', id))
+      const match = matches.find(item => item.id === id)
+      if (match?.publicShareCode) {
+        const batch = writeBatch(db)
+        batch.delete(doc(db, 'matches', id))
+        batch.delete(doc(db, 'publicMatches', match.publicShareCode))
+        await batch.commit()
+      } else {
+        await deleteDoc(doc(db, 'matches', id))
+      }
       toast.success('Match deleted')
-    } catch { toast.error('Failed to delete match') }
+    } catch (error) {
+      console.error('Failed to delete match', error)
+      toast.error('Failed to delete match')
+    }
+  }
+
+  const handleShareMatch = async (match) => {
+    if (!match.publicShareCode && !['innings1', 'innings2', 'completed'].includes(match.status)) {
+      toast.error('Start the match before sharing its live dashboard')
+      return
+    }
+
+    setShareLoadingId(match.id)
+    try {
+      let shareCode = match.publicShareCode
+      if (!shareCode) {
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const candidate = generateMatchShareCode()
+          const existing = await getDoc(doc(db, 'publicMatches', candidate))
+          if (!existing.exists()) {
+            shareCode = candidate
+            break
+          }
+        }
+        if (!shareCode) throw new Error('Could not generate an unused match code')
+
+        const playerNames = Object.fromEntries(players.map(player => [player.id, player.name]))
+        const batch = writeBatch(db)
+        batch.update(doc(db, 'matches', match.id), { publicShareCode: shareCode })
+        batch.set(doc(db, 'publicMatches', shareCode), createPublicMatchView(match, match.id, playerNames))
+        await batch.commit()
+        setMatches(current => current.map(item => item.id === match.id ? { ...item, publicShareCode: shareCode } : item))
+      }
+
+      const watchUrl = new URL(`/watch/${shareCode}`, window.location.origin).toString()
+      try {
+        await navigator.clipboard.writeText(watchUrl)
+        toast.success('Watch link copied to clipboard')
+      } catch (clipboardError) {
+        console.error('Could not copy watch link', clipboardError)
+        toast.success(`Share code: ${shareCode}`)
+      }
+    } catch (error) {
+      console.error('Failed to create match share link', error)
+      toast.error('Could not create a share link')
+    } finally {
+      setShareLoadingId(null)
+    }
+  }
+
+  const stopSharing = async (match) => {
+    if (!window.confirm('Stop sharing this match? The watch link will stop working.')) return
+    setShareLoadingId(match.id)
+    try {
+      const batch = writeBatch(db)
+      batch.update(doc(db, 'matches', match.id), { publicShareCode: deleteField() })
+      batch.delete(doc(db, 'publicMatches', match.publicShareCode))
+      await batch.commit()
+      setMatches(current => current.map(item => {
+        if (item.id !== match.id) return item
+        const { publicShareCode, ...updatedMatch } = item
+        return updatedMatch
+      }))
+      toast.success('Match sharing stopped')
+    } catch (error) {
+      console.error('Failed to stop match sharing', error)
+      toast.error('Could not stop sharing this match')
+    } finally {
+      setShareLoadingId(null)
+    }
   }
 
   const createRematch = async (match) => {
@@ -144,6 +223,38 @@ export default function AdminPanel() {
 
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-white/60">{m.teamA?.name} vs {m.teamB?.name}</span>
+                  </div>
+
+                  {m.publicShareCode && (
+                    <Link
+                      to={`/watch/${m.publicShareCode}`}
+                      className="block rounded-lg border border-gold/20 bg-gold/5 px-3 py-2 font-mono text-xs tracking-widest text-gold"
+                    >
+                      Watch code: {m.publicShareCode}
+                    </Link>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      fullWidth
+                      loading={shareLoadingId === m.id}
+                      disabled={shareLoadingId !== null || (!m.publicShareCode && !['innings1', 'innings2', 'completed'].includes(m.status))}
+                      onClick={() => handleShareMatch(m)}
+                    >
+                      <Link2 size={13} /> {m.publicShareCode ? 'Copy Watch Link' : 'Share Live Match'}
+                    </Button>
+                    {m.publicShareCode && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={shareLoadingId !== null}
+                        onClick={() => stopSharing(m)}
+                        aria-label="Stop sharing match"
+                      >
+                        <Unlink size={13} />
+                      </Button>
+                    )}
                   </div>
 
                   {m.teamA?.playerIds?.length > 0 && m.teamB?.playerIds?.length > 0 && (
