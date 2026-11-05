@@ -1,9 +1,10 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Shield, Bell, LogOut, ChevronLeft, Menu } from 'lucide-react'
+import { Shield, LogOut, ChevronLeft } from 'lucide-react'
 import useAuthStore from '../../store/useAuthStore'
 import Avatar from '../ui/Avatar'
 import { useState } from 'react'
+import NotificationCenter from './NotificationCenter'
 
 export default function Navbar({ title, backTo }) {
   const { user, profile, logout, isAdmin } = useAuthStore()
@@ -43,6 +44,7 @@ export default function Navbar({ title, backTo }) {
 
           {/* Right actions */}
           <div className="flex items-center gap-1">
+            <NotificationCenter />
             {isAdmin() && (
               <Link
                 to="/admin"

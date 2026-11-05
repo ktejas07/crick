@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { doc, onSnapshot, updateDoc, collection, query, orderBy, getDocs, arrayUnion } from 'firebase/firestore'
+import { doc, onSnapshot, writeBatch, collection, query, orderBy, getDocs } from 'firebase/firestore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Minus, Check, ChevronRight, Users } from 'lucide-react'
 import { toast } from 'react-hot-toast'
@@ -9,6 +9,7 @@ import AppLayout from '../../components/Layout/AppLayout'
 import Button from '../../components/ui/Button'
 import Avatar from '../../components/ui/Avatar'
 import Spinner from '../../components/ui/Spinner'
+import { addNotificationsToBatch } from '../../utils/notifications'
 
 export default function TeamBuilder() {
   const { id: matchId } = useParams()
@@ -66,27 +67,42 @@ export default function TeamBuilder() {
     }
     setSaving(true)
     try {
-      // Notify players (update their notification array in users collection)
       const allInvited = [...new Set([...teamA, ...teamB])]
-      for (const uid of allInvited) {
-        if (!match?.notifiedPlayers?.includes(uid)) {
-          await updateDoc(doc(db, 'users', uid), {
-            notifications: arrayUnion({
-              matchId,
-              title: 'You\'ve been added to a match!',
-              message: `${match.title} — check it out!`,
-              read: false,
-              createdAt: Date.now(),
-            })
-          })
-        }
-      }
+      const previouslyAssigned = new Set([
+        ...(match?.teamA?.playerIds || []),
+        ...(match?.teamB?.playerIds || []),
+      ])
+      const newlyAssigned = allInvited.filter(uid => !previouslyAssigned.has(uid))
 
-      await updateDoc(doc(db, 'matches', matchId), {
+      const notices = []
+      if (newlyAssigned.length) {
+        notices.push({
+          id: `match-${matchId}-player-added`,
+          type: 'player-added',
+          title: 'You’re in the squad',
+          message: `You’ve been added to ${match.title}.`,
+          matchId,
+          recipients: newlyAssigned,
+        })
+      }
+      notices.push({
+        id: `match-${matchId}-scheduled`,
+        type: 'scheduled',
+        title: 'Upcoming match scheduled',
+        message: `${match.title} is on the calendar at ${match.venue || 'a venue to be confirmed'}.`,
+        matchId,
+        recipients: allInvited,
+      })
+
+      const batch = writeBatch(db)
+      batch.update(doc(db, 'matches', matchId), {
         'teamA.playerIds': teamA,
         'teamB.playerIds': teamB,
-        notifiedPlayers: allInvited,
+        notifiedPlayers: [...new Set([...(match?.notifiedPlayers || []), ...allInvited])],
       })
+      await addNotificationsToBatch(batch, notices)
+      await batch.commit()
+
       toast.success('Teams saved! Proceed to umpire setup.')
     } catch (err) {
       toast.error('Failed to save teams')

@@ -36,11 +36,35 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoURL', 'photoPath'])
           && request.resource.data.photoURL is string
           && request.resource.data.photoURL.size() <= 350000)
+        || (isSignedIn()
+          && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notifications']))
         || (isFirstAdminClaim(uid)
           && resource.data.role == 'player'
           && request.resource.data.role == 'admin'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']));
       allow delete: if isAdmin();
+
+      match /notifications/{notificationId} {
+        allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly([
+            'type', 'title', 'message', 'matchId', 'read', 'createdAt'
+          ])
+          && request.resource.data.keys().hasAll([
+            'type', 'title', 'message', 'matchId', 'read', 'createdAt'
+          ])
+          && request.resource.data.type is string
+          && request.resource.data.title is string
+          && request.resource.data.message is string
+          && request.resource.data.matchId is string
+          && request.resource.data.read == false;
+        allow update: if isSignedIn()
+          && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          && request.resource.data.read is bool;
+        allow delete: if false;
+      }
     }
 
     // Public-facing player names and statistics; never store email or notifications here.

@@ -23,6 +23,7 @@ import {
   WICKET_TYPES,
 } from '../../utils/cricketEngine'
 import { createPublicMatchView } from '../../utils/publicMatch'
+import { addNotificationsToBatch, getMatchNotifications } from '../../utils/notifications'
 
 // ─── Button configs ──────────────────────────────────────────────────────────
 const RUN_BUTTONS = [
@@ -169,6 +170,9 @@ export default function UmpireUI() {
         createPublicMatchView({ ...match, ...updates }, matchId, playerNames)
       )
     }
+    const nextMatch = { ...match, ...updates }
+    const notifications = getMatchNotifications(match, nextMatch, matchId, players)
+    await addNotificationsToBatch(batch, notifications)
     await batch.commit()
   }, [match, matchId, players])
 

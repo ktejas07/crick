@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, Calendar, Trophy, Bell, ChevronRight } from 'lucide-react'
+import { Calendar, Trophy, ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { db } from '../firebase'
 import useAuthStore from '../store/useAuthStore'
 import AppLayout from '../components/Layout/AppLayout'
 import MatchCard from '../components/MatchCard'
-import Badge from '../components/ui/Badge'
 import Card from '../components/ui/Card'
 import Spinner from '../components/ui/Spinner'
 import { aggregatePlayerStats, getPlayerMatchStats } from '../utils/statsHelper'
@@ -38,8 +37,6 @@ export default function Dashboard() {
 
   const liveMatches  = matches.filter(m => m.status === 'innings1' || m.status === 'innings2')
   const upcomingMatches = matches.filter(m => m.status === 'scheduled' || m.status === 'toss')
-  const pastMatches  = matches.filter(m => m.status === 'completed')
-
   // My matches (player is in teamA or teamB)
   const myMatches = matches.filter(m =>
     m.teamA?.playerIds?.includes(user?.uid) ||
@@ -48,9 +45,6 @@ export default function Dashboard() {
   const myStats = user?.uid
     ? aggregatePlayerStats(getPlayerMatchStats(matches, user.uid))
     : null
-
-  // Unread notifications
-  const unread = (profile?.notifications || []).filter(n => !n.read).length
 
   return (
     <AppLayout>
@@ -68,16 +62,6 @@ export default function Dashboard() {
               {profile?.name?.split(' ')[0] || 'Player'} 👋
             </h1>
           </div>
-          {unread > 0 && (
-            <div className="relative">
-              <div className="w-8 h-8 rounded-xl bg-gold/20 flex items-center justify-center border border-gold/30">
-                <Bell size={16} className="text-gold" />
-              </div>
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-danger rounded-full text-white text-[10px] flex items-center justify-center font-bold">
-                {unread}
-              </span>
-            </div>
-          )}
         </motion.div>
 
         {/* Live Matches */}
