@@ -166,7 +166,7 @@ export default function UmpireUI() {
   const currentOverBalls = innings ? getCurrentOverBalls(innings) : []
   const slots            = Array.from({ length: 6 }, (_, i) => currentOverBalls[i] || null)
 
-  const persistMatchUpdates = useCallback(async (updates) => {
+  const persistMatchUpdates = useCallback(async (updates, additionalNotifications = []) => {
     const batch = writeBatch(db)
     batch.update(doc(db, 'matches', matchId), updates)
     if (match?.publicShareCode) {
@@ -179,7 +179,10 @@ export default function UmpireUI() {
       )
     }
     const nextMatch = { ...match, ...updates }
-    const notifications = getMatchNotifications(match, nextMatch, matchId, players)
+    const notifications = [
+      ...getMatchNotifications(match, nextMatch, matchId, players),
+      ...additionalNotifications,
+    ]
     await addNotificationsToBatch(batch, notifications)
     await batch.commit()
   }, [match, matchId, players])
@@ -413,13 +416,29 @@ export default function UmpireUI() {
     }
 
     const newInnings = createInnings(battingTeam, bowlingTeam, firstBatsman1, firstBatsman2, firstBowler)
+    const tossWinnerName = tossWinnerId === 'teamA'
+      ? match.teamA?.name || 'Team A'
+      : match.teamB?.name || 'Team B'
+    const battingTeamName = battingTeam === 'teamA'
+      ? match.teamA?.name || 'Team A'
+      : match.teamB?.name || 'Team B'
 
     try {
       await persistMatchUpdates({
         status:  'innings1',
         toss:    { ...match.toss, winner: tossWinnerId, side: tossSideResult, choice: tossChoice },
         innings: [newInnings],
-      })
+      }, [{
+        id: `match-${matchId}-toss-decision`,
+        type: 'toss-decision',
+        title: 'The toss is decided',
+        message: `${tossWinnerName} won the toss and chose to ${tossChoice} first. ${battingTeamName} will bat first.`,
+        matchId,
+        recipients: [...new Set([
+          ...(match.teamA?.playerIds || []),
+          ...(match.teamB?.playerIds || []),
+        ])],
+      }])
       toast.success('Match started! 🏏')
     } catch (error) {
       console.error('Failed to start match', error)
@@ -451,6 +470,7 @@ export default function UmpireUI() {
       setTossWinner(winner)
       setCoinHasFlipped(true)
       setIsTossing(false)
+      coinFlipLock.current = false
     } catch (error) {
       coinFlipLock.current = false
       finishCoinAnimation.current?.()
@@ -458,8 +478,29 @@ export default function UmpireUI() {
       setIsTossing(false)
       setTossSide(null)
       setCoinHasFlipped(false)
+      setMatch(current => current ? { ...current, status: 'scheduled', toss: null } : current)
       console.error('Could not save toss result', error)
       toast.error('Could not save the toss. Please try again.')
+    }
+  }
+
+  const handleRetoss = async () => {
+    if (coinFlipLock.current || isTossing) return
+    coinFlipLock.current = true
+
+    try {
+      await persistMatchUpdates({ status: 'scheduled', toss: null })
+      setMatch(current => current ? { ...current, status: 'scheduled', toss: null } : current)
+      setTossWinner(null)
+      setTossSide(null)
+      setTossChoice('bat')
+      setCoinHasFlipped(false)
+      toast.success('Toss reset. Flip again when you’re ready.')
+    } catch (error) {
+      console.error('Could not reset toss', error)
+      toast.error('Could not reset the toss. Please try again.')
+    } finally {
+      coinFlipLock.current = false
     }
   }
 
@@ -559,13 +600,12 @@ export default function UmpireUI() {
             <motion.div
               className="toss-coin-scene"
               animate={{
-                rotateY: isTossing || coinHasFlipped ? coinRotation : tossSideResult === 'tails' ? 180 : 0,
-                rotateZ: isTossing ? 18 : 0,
-                y: isTossing ? -10 : 0,
+                y: isTossing ? [0, -42, -88, -48, -76, -34, 0] : 0,
               }}
               transition={{
-                duration: reduceMotion ? 0.01 : isTossing ? 2.8 : 0.35,
-                ease: isTossing ? [0.12, 0.8, 0.2, 1] : 'easeOut',
+                duration: isTossing ? 3.6 : reduceMotion ? 0.01 : 0.35,
+                times: [0, 0.14, 0.3, 0.48, 0.66, 0.83, 1],
+                ease: 'easeInOut',
               }}
               onAnimationComplete={() => {
                 if (!isTossing) return
@@ -573,16 +613,29 @@ export default function UmpireUI() {
                 finishCoinAnimation.current = null
               }}
             >
-              <div className="toss-coin">
-                <div className="toss-coin-face toss-coin-heads">
-                  <span className="toss-coin-mark">CA</span>
-                  <span>HEADS</span>
+              <motion.div
+                className="toss-coin-spin"
+                animate={{
+                  rotateY: isTossing || coinHasFlipped ? coinRotation : tossSideResult === 'tails' ? 180 : 0,
+                  rotateZ: isTossing ? [0, 16, -12, 10, -6, 3, 0] : 0,
+                }}
+                transition={{
+                  duration: isTossing ? 3.6 : reduceMotion ? 0.01 : 0.35,
+                  times: [0, 0.14, 0.3, 0.48, 0.66, 0.83, 1],
+                  ease: isTossing ? [0.18, 0.68, 0.3, 1] : 'easeOut',
+                }}
+              >
+                <div className="toss-coin">
+                  <div className="toss-coin-face toss-coin-heads">
+                    <span className="toss-coin-mark">CA</span>
+                    <span>HEADS</span>
+                  </div>
+                  <div className="toss-coin-face toss-coin-tails">
+                    <Coins size={27} strokeWidth={1.4} />
+                    <span>TAILS</span>
+                  </div>
                 </div>
-                <div className="toss-coin-face toss-coin-tails">
-                  <Coins size={27} strokeWidth={1.4} />
-                  <span>TAILS</span>
-                </div>
-              </div>
+              </motion.div>
             </motion.div>
 
             <AnimatePresence mode="wait">
@@ -620,6 +673,15 @@ export default function UmpireUI() {
                 <Coins size={17} />
                 {isTossing ? 'Flipping…' : 'Flip the coin'}
               </motion.button>
+            )}
+            {tossWinnerId && (
+              <button
+                type="button"
+                onClick={handleRetoss}
+                className="toss-retoss-button"
+              >
+                <RotateCcw size={13} /> Retoss
+              </button>
             )}
           </section>
 

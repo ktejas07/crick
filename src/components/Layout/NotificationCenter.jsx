@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Check,
   CircleDot,
+  Coins,
   Sparkles,
   Target,
   Trophy,
@@ -28,6 +29,7 @@ import useAuthStore from '../../store/useAuthStore'
 const notificationIcons = {
   'player-added': Users,
   scheduled: CalendarDays,
+  'toss-decision': Coins,
   milestone: Trophy,
   'hat-trick': Target,
   maiden: CircleDot,
