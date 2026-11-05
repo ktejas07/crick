@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { doc, onSnapshot, collection, getDocs, writeBatch } from 'firebase/firestore'
-import { motion, AnimatePresence } from 'framer-motion'
-import { RotateCcw, ArrowLeftRight, ChevronRight, Pencil, Zap } from 'lucide-react'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { RotateCcw, ArrowLeftRight, ChevronRight, Pencil, Zap, Coins, Sparkles } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { db } from '../../firebase'
 import AppLayout from '../../components/Layout/AppLayout'
@@ -58,6 +58,7 @@ function BallDot({ ball }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function UmpireUI() {
   const { id: matchId } = useParams()
+  const reduceMotion = useReducedMotion()
 
   const [match,   setMatch]   = useState(null)
   const [players, setPlayers] = useState({}) // uid → profile
@@ -69,7 +70,6 @@ export default function UmpireUI() {
   const [showBatsman,  setShowBatsman]  = useState(false)
   const [showBowler,   setShowBowler]   = useState(false)
   const [batsmanToReplace, setBatsmanToReplace] = useState('')
-  const [showToss,     setShowToss]     = useState(false)
   const [showEnd,      setShowEnd]      = useState(false)
 
   // Pending delivery (for extras + runs combination)
@@ -82,8 +82,13 @@ export default function UmpireUI() {
   const [dismissedBatter,  setDismissedBatter]   = useState('striker')
 
   // Toss
-  const [tossWinner, setTossWinner] = useState('teamA')
+  const [tossWinner, setTossWinner] = useState(null)
+  const [tossSide, setTossSide] = useState(null)
   const [tossChoice, setTossChoice] = useState('bat')
+  const [isTossing, setIsTossing] = useState(false)
+  const [coinHasFlipped, setCoinHasFlipped] = useState(false)
+  const finishCoinAnimation = useRef(null)
+  const coinFlipLock = useRef(false)
   const [openingStriker, setOpeningStriker] = useState('')
   const [openingNonStriker, setOpeningNonStriker] = useState('')
   const [openingBowler, setOpeningBowler] = useState('')
@@ -117,16 +122,19 @@ export default function UmpireUI() {
   const getPlayerName = useCallback((uid) =>
     players[uid]?.name?.split(' ')[0] || uid?.slice(0, 6) || '?', [players])
 
-  const tossBattingTeam = tossChoice === 'bat'
-    ? tossWinner
-    : (tossWinner === 'teamA' ? 'teamB' : 'teamA')
+  const tossWinnerId = isTossing ? null : tossWinner || match?.toss?.winner || null
+  const tossSideResult = tossSide || match?.toss?.side
+    || (match?.toss?.winner ? (match.toss.winner === 'teamA' ? 'heads' : 'tails') : null)
+  const tossBattingTeam = !tossWinnerId
+    ? null
+    : tossChoice === 'bat' ? tossWinnerId : tossWinnerId === 'teamA' ? 'teamB' : 'teamA'
   const openingPlayerIds = tossBattingTeam === 'teamA'
     ? (match?.teamA?.playerIds || [])
-    : (match?.teamB?.playerIds || [])
+    : tossBattingTeam === 'teamB' ? (match?.teamB?.playerIds || []) : []
   const openingBowlingTeam = tossBattingTeam === 'teamA' ? 'teamB' : 'teamA'
   const openingBowlerIds = openingBowlingTeam === 'teamA'
     ? (match?.teamA?.playerIds || [])
-    : (match?.teamB?.playerIds || [])
+    : tossBattingTeam ? (match?.teamB?.playerIds || []) : []
   const openingStrikerId = openingPlayerIds.includes(openingStriker)
     ? openingStriker
     : openingPlayerIds[0] || ''
@@ -371,11 +379,20 @@ export default function UmpireUI() {
 
   // ── Toss setup ────────────────────────────────────────────────────
   const handleTossConfirm = async () => {
-    const battingTeam = tossChoice === 'bat' ? tossWinner : (tossWinner === 'teamA' ? 'teamB' : 'teamA')
+    if (!tossWinnerId) {
+      toast.error('Flip the coin before setting up the innings')
+      return
+    }
+
+    const battingTeam = tossChoice === 'bat' ? tossWinnerId : (tossWinnerId === 'teamA' ? 'teamB' : 'teamA')
     const bowlingTeam = battingTeam === 'teamA' ? 'teamB' : 'teamA'
 
-    const battingPlayerIds = battingTeam === 'teamA' ? match.teamA.playerIds : match.teamB.playerIds
-    const bowlingPlayerIds = bowlingTeam === 'teamA' ? match.teamA.playerIds : match.teamB.playerIds
+    const battingPlayerIds = battingTeam === 'teamA'
+      ? match.teamA?.playerIds || []
+      : match.teamB?.playerIds || []
+    const bowlingPlayerIds = bowlingTeam === 'teamA'
+      ? match.teamA?.playerIds || []
+      : match.teamB?.playerIds || []
 
     if (battingPlayerIds.length < 2) { toast.error('Need at least 2 players in batting team'); return }
     if (bowlingPlayerIds.length < 1) { toast.error('Need at least 1 player in bowling team'); return }
@@ -400,14 +417,49 @@ export default function UmpireUI() {
     try {
       await persistMatchUpdates({
         status:  'innings1',
-        toss:    { winner: tossWinner, choice: tossChoice },
+        toss:    { ...match.toss, winner: tossWinnerId, side: tossSideResult, choice: tossChoice },
         innings: [newInnings],
       })
-      setShowToss(false)
       toast.success('Match started! 🏏')
     } catch (error) {
       console.error('Failed to start match', error)
       toast.error('Could not start the match. Please try again.')
+    }
+  }
+
+  const handleCoinFlip = async () => {
+    if (coinFlipLock.current || isTossing || tossWinnerId) return
+    coinFlipLock.current = true
+
+    const side = Math.random() < 0.5 ? 'heads' : 'tails'
+    const winner = side === 'heads' ? 'teamA' : 'teamB'
+    const animationPromise = new Promise(resolve => {
+      finishCoinAnimation.current = resolve
+    })
+
+    setTossSide(side)
+    setIsTossing(true)
+
+    try {
+      await Promise.all([
+        persistMatchUpdates({
+          status: 'toss',
+          toss: { winner, side, choice: null, flippedAt: Date.now() },
+        }),
+        animationPromise,
+      ])
+      setTossWinner(winner)
+      setCoinHasFlipped(true)
+      setIsTossing(false)
+    } catch (error) {
+      coinFlipLock.current = false
+      finishCoinAnimation.current?.()
+      finishCoinAnimation.current = null
+      setIsTossing(false)
+      setTossSide(null)
+      setCoinHasFlipped(false)
+      console.error('Could not save toss result', error)
+      toast.error('Could not save the toss. Please try again.')
     }
   }
 
@@ -482,93 +534,173 @@ export default function UmpireUI() {
 
   // PRE-TOSS SCREEN
   if (match.status === 'scheduled' || match.status === 'toss') {
+    const coinRotation = tossSideResult === 'tails' ? 8 * 360 + 180 : 8 * 360
+    const tossTeamName = tossWinnerId === 'teamA' ? match.teamA?.name : match.teamB?.name
+
     return (
       <AppLayout title="Umpire" backTo="/admin">
-        <div className="page-container pt-4 space-y-5">
-          <h1 className="font-display font-bold text-2xl text-white">{match.title}</h1>
-          <p className="text-white/40 text-sm">Do the toss to start the match.</p>
-          <div className="space-y-3">
-            <div className="glass rounded-2xl p-4 space-y-3">
-              <p className="text-white/60 text-sm font-semibold">Toss Winner</p>
-              <div className="flex gap-2">
-                {['teamA', 'teamB'].map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setTossWinner(t)}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all border ${
-                      tossWinner === t
-                        ? 'bg-gold text-midnight border-gold shadow-gold'
-                        : 'bg-midnight-200 text-white/60 border-border'
-                    }`}
-                  >
-                    {t === 'teamA' ? match.teamA?.name : match.teamB?.name}
-                  </button>
-                ))}
+        <div className="page-container pt-4 space-y-5 toss-page">
+          <div className="toss-page-heading">
+            <p className="toss-eyebrow"><Sparkles size={13} /> THE MOMENT BEFORE THE MATCH</p>
+            <h1 className="font-display font-bold text-2xl text-white">{match.title}</h1>
+            <p className="text-white/40 text-sm">Let the coin decide who calls the first move.</p>
+          </div>
+
+          <section className="toss-stage" aria-label="Coin toss">
+            <div className="toss-team-label toss-team-heads">
+              <span className="toss-side-label">HEADS</span>
+              <strong>{match.teamA?.name || 'Team A'}</strong>
+            </div>
+            <div className="toss-team-label toss-team-tails">
+              <span className="toss-side-label">TAILS</span>
+              <strong>{match.teamB?.name || 'Team B'}</strong>
+            </div>
+
+            <motion.div
+              className="toss-coin-scene"
+              animate={{
+                rotateY: isTossing || coinHasFlipped ? coinRotation : tossSideResult === 'tails' ? 180 : 0,
+                rotateZ: isTossing ? 18 : 0,
+                y: isTossing ? -10 : 0,
+              }}
+              transition={{
+                duration: reduceMotion ? 0.01 : isTossing ? 2.8 : 0.35,
+                ease: isTossing ? [0.12, 0.8, 0.2, 1] : 'easeOut',
+              }}
+              onAnimationComplete={() => {
+                if (!isTossing) return
+                finishCoinAnimation.current?.()
+                finishCoinAnimation.current = null
+              }}
+            >
+              <div className="toss-coin">
+                <div className="toss-coin-face toss-coin-heads">
+                  <span className="toss-coin-mark">CA</span>
+                  <span>HEADS</span>
+                </div>
+                <div className="toss-coin-face toss-coin-tails">
+                  <Coins size={27} strokeWidth={1.4} />
+                  <span>TAILS</span>
+                </div>
               </div>
-              <p className="text-white/60 text-sm font-semibold">Chose to</p>
-              <div className="flex gap-2">
+            </motion.div>
+
+            <AnimatePresence mode="wait">
+              {tossWinnerId ? (
+                <motion.div
+                  key="toss-result"
+                  className="toss-result"
+                  initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={reduceMotion ? undefined : { opacity: 0, y: -5 }}
+                >
+                  <span>{tossSideResult === 'heads' ? 'HEADS' : 'TAILS'} — THE TOSS GOES TO</span>
+                  <strong>{tossTeamName}</strong>
+                </motion.div>
+              ) : (
+                <motion.p
+                  key="toss-prompt"
+                  className="toss-prompt"
+                  initial={reduceMotion ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  {isTossing ? 'The coin is in the air…' : 'Ready when you are, Umpire.'}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            {!tossWinnerId && (
+              <motion.button
+                type="button"
+                onClick={handleCoinFlip}
+                disabled={isTossing}
+                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                className="toss-flip-button"
+              >
+                <Coins size={17} />
+                {isTossing ? 'Flipping…' : 'Flip the coin'}
+              </motion.button>
+            )}
+          </section>
+
+          <AnimatePresence>
+            {tossWinnerId && (
+              <motion.section
+                className="glass toss-setup-card"
+                initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.25 }}
+              >
+                <div className="toss-setup-heading">
+                  <div>
+                    <p className="toss-eyebrow">THE CAPTAIN’S CALL</p>
+                    <h2>{tossTeamName} won the toss</h2>
+                  </div>
+                  <span className="toss-setup-icon"><Zap size={17} /></span>
+                </div>
+                <p className="text-white/50 text-sm">Choose how they’ll start the match.</p>
+                <div className="toss-choice-grid" role="group" aria-label="Toss winner's decision">
                 {['bat', 'bowl'].map(c => (
                   <button
                     key={c}
                     onClick={() => setTossChoice(c)}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all border capitalize ${
-                      tossChoice === c
-                        ? 'bg-sapphire text-white border-sapphire shadow-sapphire'
-                        : 'bg-midnight-200 text-white/60 border-border'
-                    }`}
+                    className={`toss-choice-button ${tossChoice === c ? 'toss-choice-selected' : ''}`}
+                    aria-pressed={tossChoice === c}
                   >
-                    {c}
+                    <span>{c === 'bat' ? 'Bat first' : 'Bowl first'}</span>
+                    <small>{c === 'bat' ? 'Set the target' : 'Chase the total'}</small>
                   </button>
                 ))}
-              </div>
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <label className="min-w-0">
-                  <span className="text-white/60 text-xs font-semibold">Opening striker</span>
-                  <select
-                    value={openingStrikerId}
-                    onChange={event => setOpeningStriker(event.target.value)}
-                    className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
-                  >
-                    {openingPlayerIds.length === 0 && <option value="">No players available</option>}
-                    {openingPlayerIds.map(uid => (
-                      <option key={uid} value={uid}>{getPlayerName(uid)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="min-w-0">
-                  <span className="text-white/60 text-xs font-semibold">Opening non-striker</span>
-                  <select
-                    value={openingNonStrikerId}
-                    onChange={event => setOpeningNonStriker(event.target.value)}
-                    className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
-                  >
-                    {openingPlayerIds.filter(uid => uid !== openingStrikerId).length === 0 && (
-                      <option value="">No other batter available</option>
-                    )}
-                    {openingPlayerIds.filter(uid => uid !== openingStrikerId).map(uid => (
-                      <option key={uid} value={uid}>{getPlayerName(uid)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="min-w-0 col-span-2">
-                  <span className="text-white/60 text-xs font-semibold">Opening bowler</span>
-                  <select
-                    value={openingBowlerId}
-                    onChange={event => setOpeningBowler(event.target.value)}
-                    className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
-                  >
-                    {openingBowlerIds.length === 0 && <option value="">No players available</option>}
-                    {openingBowlerIds.map(uid => (
-                      <option key={uid} value={uid}>{getPlayerName(uid)}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </div>
-            <Button fullWidth size="xl" onClick={handleTossConfirm}>
-              <Zap size={20} /> Start Match
-            </Button>
-          </div>
+                </div>
+                <div className="toss-player-grid">
+                  <label className="min-w-0">
+                    <span className="text-white/60 text-xs font-semibold">Opening striker</span>
+                    <select
+                      value={openingStrikerId}
+                      onChange={event => setOpeningStriker(event.target.value)}
+                      className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
+                    >
+                      {openingPlayerIds.length === 0 && <option value="">No players available</option>}
+                      {openingPlayerIds.map(uid => (
+                        <option key={uid} value={uid}>{getPlayerName(uid)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="min-w-0">
+                    <span className="text-white/60 text-xs font-semibold">Opening non-striker</span>
+                    <select
+                      value={openingNonStrikerId}
+                      onChange={event => setOpeningNonStriker(event.target.value)}
+                      className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
+                    >
+                      {openingPlayerIds.filter(uid => uid !== openingStrikerId).length === 0 && (
+                        <option value="">No other batter available</option>
+                      )}
+                      {openingPlayerIds.filter(uid => uid !== openingStrikerId).map(uid => (
+                        <option key={uid} value={uid}>{getPlayerName(uid)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="min-w-0 col-span-2">
+                    <span className="text-white/60 text-xs font-semibold">Opening bowler</span>
+                    <select
+                      value={openingBowlerId}
+                      onChange={event => setOpeningBowler(event.target.value)}
+                      className="mt-1.5 w-full bg-midnight-100 border border-border rounded-xl px-3 py-2.5 text-white text-sm"
+                    >
+                      {openingBowlerIds.length === 0 && <option value="">No players available</option>}
+                      {openingBowlerIds.map(uid => (
+                        <option key={uid} value={uid}>{getPlayerName(uid)}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <Button fullWidth size="xl" onClick={handleTossConfirm}>
+                  <Zap size={20} /> Start Match
+                </Button>
+              </motion.section>
+            )}
+          </AnimatePresence>
         </div>
       </AppLayout>
     )

@@ -405,6 +405,312 @@
     box-shadow: 0 0 0 3px rgba(211, 167, 92, 0.12);
   }
 
+  .toss-page-heading {
+    display: grid;
+    gap: 7px;
+  }
+
+  .toss-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    color: #b6a36f;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+  }
+
+  .toss-page-heading h1 {
+    margin: 2px 0 0;
+  }
+
+  .toss-stage {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 15px;
+    overflow: hidden;
+    perspective: 900px;
+    border: 1px solid rgba(202, 177, 108, 0.2);
+    border-radius: 24px;
+    padding: 21px 19px 22px;
+    background:
+      radial-gradient(ellipse at 50% 43%, rgba(245, 158, 11, 0.1), transparent 42%),
+      linear-gradient(150deg, rgba(28, 38, 51, 0.96), rgba(13, 20, 32, 0.96));
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .toss-stage::before,
+  .toss-stage::after {
+    position: absolute;
+    top: 50%;
+    width: 45px;
+    height: 1px;
+    content: '';
+    background: linear-gradient(90deg, transparent, rgba(217, 187, 111, 0.3));
+  }
+
+  .toss-stage::before {
+    left: 0;
+  }
+
+  .toss-stage::after {
+    right: 0;
+    transform: rotate(180deg);
+  }
+
+  .toss-team-label {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .toss-team-tails {
+    flex-direction: row-reverse;
+    text-align: right;
+  }
+
+  .toss-side-label {
+    flex: 0 0 auto;
+    border: 1px solid rgba(226, 190, 104, 0.2);
+    border-radius: 999px;
+    padding: 5px 8px;
+    color: #d7bd7b;
+    background: rgba(215, 189, 123, 0.07);
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+  }
+
+  .toss-team-label strong {
+    overflow: hidden;
+    color: rgba(237, 238, 230, 0.78);
+    font-size: 11px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .toss-coin-scene {
+    position: relative;
+    display: grid;
+    width: 126px;
+    height: 126px;
+    place-items: center;
+    transform-style: preserve-3d;
+  }
+
+  .toss-coin {
+    position: relative;
+    width: 108px;
+    height: 108px;
+    border: 5px solid #bc8834;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #f8df99 0%, #d7a94f 48%, #9a6827 100%);
+    box-shadow:
+      0 16px 27px rgba(0, 0, 0, 0.34),
+      inset 3px 4px 7px rgba(255, 249, 218, 0.72),
+      inset -4px -5px 8px rgba(105, 65, 20, 0.42),
+      0 0 0 2px rgba(255, 228, 158, 0.25);
+    transform-style: preserve-3d;
+  }
+
+  .toss-coin-face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: 1px solid rgba(126, 80, 24, 0.54);
+    border-radius: 50%;
+    color: #68461f;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .toss-coin-heads {
+    background: radial-gradient(circle at 35% 28%, #fae9b9, #d6aa59 73%, #b47e31);
+  }
+
+  .toss-coin-tails {
+    color: #526044;
+    background: radial-gradient(circle at 35% 28%, #e8eccd, #aab485 73%, #78835b);
+    transform: rotateY(180deg);
+  }
+
+  .toss-coin-mark {
+    display: grid;
+    width: 35px;
+    height: 35px;
+    margin-bottom: 2px;
+    place-items: center;
+    border: 1px solid rgba(104, 70, 31, 0.45);
+    border-radius: 50%;
+    font-family: Inter, sans-serif;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: -0.05em;
+  }
+
+  .toss-prompt {
+    min-height: 18px;
+    margin: 0;
+    color: rgba(222, 226, 218, 0.55);
+    font-size: 11px;
+  }
+
+  .toss-result {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    min-height: 38px;
+    text-align: center;
+  }
+
+  .toss-result span {
+    color: #b9a875;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+  }
+
+  .toss-result strong {
+    color: #f0dfb1;
+    font-size: 16px;
+    font-weight: 650;
+  }
+
+  .toss-flip-button {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    border: 1px solid rgba(234, 198, 117, 0.35);
+    border-radius: 13px;
+    padding: 0 18px;
+    color: #f1dfb1;
+    background: linear-gradient(145deg, rgba(165, 122, 48, 0.32), rgba(116, 79, 30, 0.23));
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    font-size: 12px;
+    font-weight: 700;
+    transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+  }
+
+  .toss-flip-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: rgba(234, 198, 117, 0.6);
+    background: linear-gradient(145deg, rgba(176, 132, 58, 0.42), rgba(129, 89, 33, 0.3));
+  }
+
+  .toss-flip-button:disabled {
+    cursor: wait;
+    opacity: 0.7;
+  }
+
+  .toss-setup-card {
+    display: grid;
+    gap: 15px;
+    border-radius: 22px;
+    padding: 17px;
+  }
+
+  .toss-setup-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .toss-setup-heading h2 {
+    margin: 5px 0 0;
+    color: #f0f2ed;
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .toss-setup-icon {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid rgba(245, 158, 11, 0.19);
+    border-radius: 12px;
+    color: #f2c56b;
+    background: rgba(245, 158, 11, 0.1);
+  }
+
+  .toss-setup-card > p {
+    margin: -7px 0 0;
+  }
+
+  .toss-choice-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .toss-choice-button {
+    display: grid;
+    gap: 4px;
+    min-height: 65px;
+    align-content: center;
+    justify-items: start;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 14px;
+    padding: 10px 12px;
+    color: rgba(241, 245, 249, 0.68);
+    background: rgba(11, 18, 30, 0.55);
+    text-align: left;
+    text-transform: capitalize;
+    transition: color 150ms ease, background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .toss-choice-button span {
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .toss-choice-button small {
+    color: rgba(203, 213, 225, 0.42);
+    font-size: 9px;
+  }
+
+  .toss-choice-button:hover {
+    border-color: rgba(96, 165, 250, 0.36);
+  }
+
+  .toss-choice-selected {
+    border-color: rgba(96, 165, 250, 0.65);
+    color: white;
+    background: rgba(59, 130, 246, 0.17);
+    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.1), 0 5px 16px rgba(29, 78, 216, 0.12);
+  }
+
+  .toss-choice-selected small {
+    color: rgba(219, 234, 254, 0.58);
+  }
+
+  .toss-player-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding-top: 2px;
+  }
+
+  .toss-player-grid label > span {
+    display: block;
+  }
+
   /* Page container */
   .page-container {
     @apply max-w-md mx-auto px-4 pb-24 pt-4;
