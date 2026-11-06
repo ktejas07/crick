@@ -30,7 +30,7 @@ service cloud.firestore {
         && request.auth.uid == uid
         && (request.resource.data.role == 'player'
           || (request.resource.data.role == 'admin' && isFirstAdminClaim(uid)));
-      allow update: if isAdmin()
+      allow update: if (isAdmin() && request.resource.data.role == resource.data.role)
         || (isSignedIn()
           && request.auth.uid == uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoURL', 'photoPath'])
@@ -43,7 +43,7 @@ service cloud.firestore {
           && resource.data.role == 'player'
           && request.resource.data.role == 'admin'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']));
-      allow delete: if isAdmin();
+      allow delete: if false;
 
       match /notifications/{notificationId} {
         allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
@@ -85,7 +85,7 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoURL'])
           && request.resource.data.photoURL is string
           && request.resource.data.photoURL.size() <= 350000);
-      allow delete: if isAdmin();
+      allow delete: if false;
     }
 
     match /system/{document} {

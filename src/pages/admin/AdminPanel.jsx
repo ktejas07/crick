@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, addDoc, serverTimestamp, getDoc, writeBatch, deleteField } from 'firebase/firestore'
+import { getFunctions, httpsCallable } from 'firebase/functions'
 import { motion } from 'framer-motion'
-import { Plus, Trash2, Shield, Users, Trophy, Copy, Link2, Unlink } from 'lucide-react'
+import { Plus, Trash2, Shield, ShieldCheck, UserPlus, Users, Trophy, Copy, Link2, Unlink } from 'lucide-react'
 import { toast } from 'react-hot-toast'
-import { db } from '../../firebase'
+import app, { db } from '../../firebase'
 import useAuthStore from '../../store/useAuthStore'
 import AppLayout from '../../components/Layout/AppLayout'
 import Button from '../../components/ui/Button'
@@ -20,9 +21,16 @@ export default function AdminPanel() {
   const [matches, setMatches] = useState([])
   const [players, setPlayers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab]         = useState('matches') // 'matches' | 'players'
+  const [tab, setTab]         = useState('matches')
   const [rematchLoadingId, setRematchLoadingId] = useState(null)
   const [shareLoadingId, setShareLoadingId] = useState(null)
+  const [adminName, setAdminName] = useState('')
+  const [adminEmail, setAdminEmail] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
+  const [adminSaving, setAdminSaving] = useState(false)
+  const [deletingPlayerId, setDeletingPlayerId] = useState(null)
+  const admins = players.filter(player => player.role === 'admin')
+  const playerAccounts = players.filter(player => player.role !== 'admin')
 
   useEffect(() => {
     const unsub1 = onSnapshot(
@@ -162,6 +170,40 @@ export default function AdminPanel() {
     }
   }
 
+  const createAdminAccount = async (event) => {
+    event.preventDefault()
+    setAdminSaving(true)
+    try {
+      const createAdmin = httpsCallable(getFunctions(app), 'createAdminAccount')
+      await createAdmin({ name: adminName, email: adminEmail, password: adminPassword })
+      setAdminName('')
+      setAdminEmail('')
+      setAdminPassword('')
+      toast.success('Administrator account created')
+    } catch (error) {
+      console.error('Failed to create administrator account', error)
+      toast.error(error.message || 'Could not create administrator account')
+    } finally {
+      setAdminSaving(false)
+    }
+  }
+
+  const deletePlayerAccount = async (player) => {
+    if (!window.confirm(`Permanently delete ${player.name}'s sign-in and player profile? Historical match records will be retained.`)) return
+
+    setDeletingPlayerId(player.id)
+    try {
+      const deletePlayer = httpsCallable(getFunctions(app), 'deletePlayerAccount')
+      await deletePlayer({ uid: player.id })
+      toast.success(`${player.name} was deleted`)
+    } catch (error) {
+      console.error('Failed to delete player account', error)
+      toast.error(error.message || 'Could not delete player account')
+    } finally {
+      setDeletingPlayerId(null)
+    }
+  }
+
   return (
     <AppLayout title="Admin Panel">
       <div className="page-container space-y-4 pt-4">
@@ -177,6 +219,7 @@ export default function AdminPanel() {
           {[
             { key: 'matches', label: 'Matches', icon: Trophy },
             { key: 'players', label: 'Players', icon: Users },
+            { key: 'admins', label: 'Admins', icon: ShieldCheck },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -313,33 +356,122 @@ export default function AdminPanel() {
         {/* ── PLAYERS TAB ── */}
         {tab === 'players' && (
           <div className="space-y-2">
-            <p className="text-white/40 text-xs">{players.length} registered players</p>
-            {players.map((p, i) => (
+            <p className="text-white/40 text-xs">{playerAccounts.length} player accounts</p>
+            {playerAccounts.map((p, i) => (
               <motion.div
                 key={p.id}
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.03 }}
               >
-                <Link to={`/player/${p.id}`}>
-                  <div className="flex items-center gap-3 bg-card border border-border rounded-xl p-3
-                                  hover:border-sapphire/40 transition-all">
+                <div className="flex items-center gap-3 bg-card border border-border rounded-xl p-3">
+                  <Link to={`/player/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                     <Avatar name={p.name} photoURL={p.photoURL} size="sm" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-white truncate text-sm">{p.name}</p>
-                        {p.role === 'admin' && <Badge variant="gold">Admin</Badge>}
-                      </div>
+                      <p className="font-medium text-white truncate text-sm">{p.name}</p>
                       <p className="text-white/30 text-xs truncate">{p.email}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="mr-2 text-right">
                       <p className="text-xs text-gold font-semibold">{p.stats?.totalRuns || 0}R</p>
                       <p className="text-xs text-danger">{p.stats?.totalWickets || 0}W</p>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    loading={deletingPlayerId === p.id}
+                    disabled={deletingPlayerId !== null}
+                    onClick={() => deletePlayerAccount(p)}
+                    aria-label={`Delete ${p.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
               </motion.div>
             ))}
+          </div>
+        )}
+
+        {/* ── ADMINS TAB ── */}
+        {tab === 'admins' && (
+          <div className="space-y-5">
+            <Card className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl border border-gold/20 bg-gold/10 p-2.5 text-gold">
+                  <UserPlus size={19} />
+                </div>
+                <div>
+                  <h2 className="font-display font-bold text-white">Create administrator</h2>
+                  <p className="mt-1 text-xs leading-5 text-white/45">
+                    Set the account credentials directly. No invitation email is sent.
+                  </p>
+                </div>
+              </div>
+              <form className="space-y-3" onSubmit={createAdminAccount}>
+                <label className="block text-sm font-medium text-white/70">
+                  Name
+                  <input
+                    required
+                    maxLength={80}
+                    autoComplete="name"
+                    value={adminName}
+                    onChange={event => setAdminName(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-border bg-midnight-100 px-4 py-3 text-sm text-white
+                               placeholder-white/30 transition-all focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold/30"
+                    placeholder="Administrator name"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-white/70">
+                  Email
+                  <input
+                    required
+                    type="email"
+                    autoComplete="email"
+                    value={adminEmail}
+                    onChange={event => setAdminEmail(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-border bg-midnight-100 px-4 py-3 text-sm text-white
+                               placeholder-white/30 transition-all focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold/30"
+                    placeholder="admin@example.com"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-white/70">
+                  Password
+                  <input
+                    required
+                    type="password"
+                    minLength={6}
+                    maxLength={128}
+                    autoComplete="new-password"
+                    value={adminPassword}
+                    onChange={event => setAdminPassword(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-border bg-midnight-100 px-4 py-3 text-sm text-white
+                               placeholder-white/30 transition-all focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold/30"
+                    placeholder="At least 6 characters"
+                  />
+                </label>
+                <Button type="submit" fullWidth loading={adminSaving}>
+                  <Shield size={15} /> Create admin account
+                </Button>
+              </form>
+            </Card>
+
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-white">Administrators</h2>
+                <Badge variant="gold">{admins.length}</Badge>
+              </div>
+              {admins.map(admin => (
+                <div key={admin.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                  <Avatar name={admin.name} photoURL={admin.photoURL} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">{admin.name}</p>
+                    <p className="truncate text-xs text-white/35">{admin.email}</p>
+                  </div>
+                  <Badge variant="gold">Admin</Badge>
+                </div>
+              ))}
+              {admins.length === 0 && <p className="py-4 text-center text-sm text-white/40">No administrators found.</p>}
+            </section>
           </div>
         )}
       </div>
